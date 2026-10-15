@@ -1,0 +1,7 @@
+myenv/
+__pycache__/
+*.py[cod]
+.env
+.vscode/
+.idea/
+bdd.db

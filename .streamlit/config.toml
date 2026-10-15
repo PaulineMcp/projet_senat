@@ -1,0 +1,6 @@
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = false
+[theme]
+base = "dark"
+borderColor = "#1c2b2e"
