@@ -2,6 +2,8 @@
         - l'ordre d'examen des amendement
         - le contenu des amendements
         - les articles
+        - des remplissages des amdts
+        - des remplissages des articles
 Via un CRON toutes les 1 min
 
 """
@@ -44,11 +46,11 @@ def maj_ordre_examen() :
     for url in urls :
         tab = get_tab(url)
         df = clean_tab_ordre(tab)
-        df["session"] = get_session(url)    
-        df["id_disc"] = get_id_disc(url)
-        df["id_article"] = df.apply(lambda x: get_id_article(x.article, x.id_disc), axis=1)
-        df["id_amdt"] = df["amdt"].apply(lambda x : get_id_amdt(x))
-        df["id_amdt"] = df["session"] + "-" + df["id_disc"] + "-" + df["id_article"] + "-"+ df["id_amdt"]
+        session = get_session(url)
+        raw_com_seance = "COM" if commission_ou_sceance(url) == "Commission" else "SCE"
+        id_disc = session + "-" + raw_com_seance + "-" + get_id_disc(url)
+        df["id_article"] = df.apply(lambda x: get_id_article(x.article, id_disc), axis=1)
+        df["id_amdt"] = df["id_article"] + "-" + df["amdt"].apply(get_id_amdt)
         df["ordre_amdt"] = df.index
         df = df[["ordre_amdt","id_amdt"]]
 
@@ -61,8 +63,16 @@ def maj_ordre_examen() :
         WHERE id_amdt = ?
         """,
         df[["ordre_amdt","id_amdt"]].values.tolist(),)
+        conn.executemany(
+        """
+        INSERT OR IGNORE INTO ordre_examen (ordre_amdt, id_amdt)
+        VALUES (?, ?)
+        """,
+        df[["ordre_amdt","id_amdt"]].values.tolist(),)
         conn.commit()
         conn.close()
+
+
 
 def maj_content_amdts()  : 
     
@@ -93,11 +103,11 @@ def maj_content_amdts()  :
         df["is_ss_amdt"] = df["amdt"].apply(lambda x: is_ss_amdt(x))
 
         df = df[["id_amdt","id_article","id_bloc_article","amdt","is_ss_amdt","lien_amdt","url_senateur","sort"]]
-        # Renvoyer les nouvelles données dans la table ordre_examen       
+        # Corrigerles nouvelles données dans la table ordre_examen       
         conn = get_conn()
         conn.executemany(
         """
-                UPDATE amdts
+        UPDATE amdts
         SET "id_article" = ?,
                 "id_bloc_article" = ?,
                 "amdt" = ?,
@@ -108,6 +118,14 @@ def maj_content_amdts()  :
         WHERE id_amdt = ?
         """,
         df[["id_article","id_bloc_article","amdt","is_ss_amdt","lien_amdt","url_senateur","sort","id_amdt"]].values.tolist(),)
+        # Envoyer les nouvelles données dans la table
+        conn.executemany(
+        """
+        INSERT OR IGNORE INTO amdts
+        (id_amdt, id_article, id_bloc_article, amdt, is_ss_amdt, lien_amdt, url_senateur, sort)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        df[["id_amdt", "id_article", "id_bloc_article", "amdt","is_ss_amdt", "lien_amdt", "url_senateur", "sort"]].values.tolist(),)
         conn.commit()
         conn.close()
 
@@ -153,7 +171,6 @@ def maj_articles():
         df_articles["ordre_article"] = df_articles.index
 
         # Renvoyer le résultat en base de données
-        conn = get_conn()
         conn.executemany(
         """
         UPDATE articles
@@ -164,13 +181,105 @@ def maj_articles():
         WHERE id_article = ?
         """,
         df_articles[["id_bloc_article","id_disc","article","ordre_article","id_article"]].values.tolist(),)
+        # Insère les nouvelles données
+        conn.executemany(
+        """
+        INSERT OR IGNORE INTO articles
+        (id_article, id_bloc_article, id_disc, article, ordre_article)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        df_articles[["id_article", "id_bloc_article", "id_disc", "article", "ordre_article"]].values.tolist(),
+        )
         conn.commit()
         conn.close()
 
+def maj_remplissage_ap_amdts():
+
+    # Récupère la liste des amdts
+    conn = get_conn()
+    amdts = pd.read_sql("SELECT id_amdt FROM amdts", conn)
+    
+    # Récupère la liste des remplissages existants
+    remplissage = pd.read_sql("SELECT id_amdt FROM remplissage_ap_amdt", conn)
+    
+    # Les nouveaux amdts sont dans la table amdts mais pas dans remplissage_ap_amdt
+    new_amdts = list(set(amdts["id_amdt"]) - set(remplissage["id_amdt"]))
+    
+    if not new_amdts:
+            print("Aucun nouvel amendement à ajouter")
+            conn.close()
+    else : 
+        df = pd.DataFrame({"id_amdt": new_amdts})
+        df["objet"] = "A compléter"
+        df["com"] = ""
+        df["proposition_vote_amdt"] = "A définir"
+
+        df.to_sql("remplissage_ap_amdt", conn, if_exists="append", index=False)
+        conn.commit()
+        print(f"De nouveaux amendements ont été ajoutés !")
+        conn.close() 
+
+def maj_remplissage_ap_articles():
+
+    # Récupère la liste des amdts
+    conn = get_conn()
+    articles = pd.read_sql("SELECT id_article FROM articles", conn)
+    
+    # Récupère la liste des remplissages existants
+    remplissage = pd.read_sql("SELECT id_article FROM remplissage_ap_article", conn)
+    
+    # Les nouveaux amdts sont dans la table amdts mais pas dans remplissage_ap_amdt
+    new_articles = list(set(articles["id_article"]) - set(remplissage["id_article"]))
+    
+    if not new_articles:
+            print("Aucun nouvel article à ajouter")
+            conn.close()
+    else : 
+        df = pd.DataFrame({"id_article": new_articles})
+        df["resume_article"] = ""
+        df["proposition_vote_article"] = ""
+        df.to_sql("remplissage_ap_article", conn, if_exists="append", index=False)
+        conn.commit()
+        print(f"De nouveaux articles ont été ajoutés !")
+        conn.close()    
+
 #############       APPELS       ##############
-maj_ordre_examen()
-print("Ordre d'examen des amdts maj !")
-maj_content_amdts()
-print("Contenu des amdts maj !")
-maj_articles()
-print("Contenu des articles maj !")
+import sqlite3
+import traceback
+
+DB_PATH = ROOT / "bdd.db"   # à vérifier : le chemin de votre base
+
+class ConnexionUnique(sqlite3.Connection):
+    """Connexion partagée : les commit() et close() des fonctions ne font rien."""
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+connexion = sqlite3.connect(DB_PATH, factory=ConnexionUnique, timeout=30)
+get_conn = lambda: connexion   # les fonctions utilisent maintenant cette connexion
+
+try:
+    maj_ordre_examen()
+    print("Ordre d'examen des amdts maj !")
+    maj_content_amdts()
+    print("Contenu des amdts maj !")
+    maj_articles()
+    print("Contenu des articles maj !")
+    maj_remplissage_ap_amdts()
+    print("Remplissage des amdts maj !")
+    maj_remplissage_ap_articles()
+    print("Remplissage des articles maj !")
+
+    sqlite3.Connection.commit(connexion)
+    print("Tout est enregistré")
+
+except Exception:
+    connexion.rollback()
+    print("Erreur : aucune modification enregistrée")
+    traceback.print_exc()
+
+finally:
+    sqlite3.Connection.close(connexion)

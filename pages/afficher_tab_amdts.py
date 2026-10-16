@@ -18,7 +18,7 @@ COLS = ["objet", "com", "proposition_vote_amdt"]
 from fonctions.get_tab_to_aff import retrieve_tab
 from fonctions.fonctions_cleaning import abrev_article
 from fonctions.fonctions_affichage import couleur_sort
-from fonctions.get_tab_to_aff import get_row_height
+from fonctions.fonctions_affichage import get_row_height
 from utils import get_conn
 
 ###############     STYLE     ###############
@@ -111,81 +111,79 @@ resumes = {}    # résumés saisis par article
 
 # Injection des données dans un tableau par article
 for article in df_global["id_article"].unique():
-    with st.container(border=True):
+    # df filtré par article
+    df_by_article = df_global[df_global["id_article"] == article].reset_index(drop=True)
+    row_height = get_row_height(df_by_article, {"objet": 200, "com": 200})
+    hauteur_tab = 35 + len(df_by_article) * row_height + 3
+    est_additionnel = True if "add" in article else False
+    libelle = df_by_article["article"].iloc[0].replace("(nouveau)","").replace("(supprimé)","").replace("(Supprimé)","")
 
-        # df filtré par article
-        df_by_article = df_global[df_global["id_article"] == article].reset_index(drop=True)
-        row_height = get_row_height(df_by_article, {"objet": 200, "com": 200})
-        hauteur_tab = 35 + len(df_by_article) * row_height + 3
-        est_additionnel = True if "add" in article else False
-        libelle = df_by_article["article"].iloc[0].replace("(nouveau)","").replace("(supprimé)","").replace("(Supprimé)","")
+    # AFFICHAGE DU N° DE L'ARTICLE ET DU RESUME
+    col_gauche, col_centre, col_droite = st.columns([1, 2, 1])
+    with col_centre:
+        with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="center"):
+            st.markdown(
+                f"<div style='font-size:24px; font-weight:600; margin:0; padding:0;'>{libelle}</div>", unsafe_allow_html=True,)
 
-        # AFFICHAGE DU N° DE L'ARTICLE ET DU RESUME
-        col_gauche, col_centre, col_droite = st.columns([1, 2, 1])
-        with col_centre:
-            with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="center"):
-                st.markdown(
-                    f"<div style='font-size:24px; font-weight:600; margin:0; padding:0;'>{libelle}</div>", unsafe_allow_html=True,)
-
-                # Récupère le résumé pour cette clé "article"
-                resume_actuel = dict_resumes.get(str(article))
-                if resume_actuel is None or pd.isna(resume_actuel):
-                    resume_actuel = ""
-                resumes[article] = st.text_input(
-                    key=f"resum_{article}",
-                    label="Résumé",
-                    label_visibility="collapsed",
-                    value=resume_actuel,
-                    placeholder="Tapez ici le résumé de l'article",
-                )
-
-        # AFFICHAGE DU TABLEAU
-        df_style = df_by_article.style.map(couleur_sort, subset=["sort"])
-
-        if pd.isna(df_by_article["amdt"].iloc[0]):
-            st.write("Pas d'amendement sur cet article")
-
-        else:
-            df_edite = st.data_editor(
-                df_style,
-                row_height = row_height,
-                key=f"editeur_{article}",
-                column_order=["abrev_article", "lien_article", "amdt", "lien_amdt", "nom_groupe","objet", "com", "avis_com", "avis_gouv", "proposition_vote_amdt", "sort"],
-                column_config={
-                    "abrev_article": st.column_config.TextColumn("Article", width= 75),
-                    "lien_article": st.column_config.LinkColumn("", display_text="🔗", width=20),
-                    "amdt": st.column_config.TextColumn("Amdt", width=100),
-                    "lien_amdt": st.column_config.LinkColumn("", display_text="🔗", width=20),
-                    "nom_groupe": st.column_config.TextColumn("Auteur·rice", width=140),
-                    "objet": st.column_config.TextColumn("Objet", width=240),
-                    "avis_gouv": st.column_config.TextColumn("Avis gouv", width=110),
-                    "avis_com": st.column_config.TextColumn("Avis com", width=110),
-                    "proposition_vote_amdt": st.column_config.SelectboxColumn("Prop. vote", options=OPTIONS, width=110),
-                    "sort": st.column_config.TextColumn("Sort", width=100),
-                },
-                disabled=["article", "lien_article", "amdt", "lien_amdt", "nom_groupe","avis_gouv", "avis_com", "sort"],
-                hide_index=True,
-                height = hauteur_tab,
-                width="stretch",
+            # Récupère le résumé pour cette clé "article"
+            resume_actuel = dict_resumes.get(str(article))
+            if resume_actuel is None or pd.isna(resume_actuel):
+                resume_actuel = ""
+            resumes[article] = st.text_input(
+                key=f"resum_{article}",
+                label="Résumé",
+                label_visibility="collapsed",
+                value=resume_actuel,
+                placeholder="Tapez ici le résumé de l'article",
             )
-            editeurs.append((df_by_article, df_edite))
 
-        # AFFICHAGE DU VOTE (pas pour les articles additionnels)
-        if not est_additionnel:
-            col_vote, col_droite = st.columns(2)
-            with col_vote:
-                with st.container(horizontal=True):
-                    st.write(f"Vote sur l'{libelle}")
-                    col, _ = st.columns([1, 1])
-                    with col:
-                        vote_actuel = dict_votes_articles.get(str(article))
-                        votes[article] = st.selectbox(
-                            f"vote-{article}",
-                            OPTIONS,
-                            index=OPTIONS.index(vote_actuel) if vote_actuel in OPTIONS else None,
-                            placeholder="Sélectionner un vote",
-                            key=f"vote_{article}",
-                            label_visibility="collapsed",
+    # AFFICHAGE DU TABLEAU
+    df_style = df_by_article.style.map(couleur_sort, subset=["sort"])
+
+    if pd.isna(df_by_article["amdt"].iloc[0]):
+        st.write("Pas d'amendement sur cet article")
+
+    else:
+        df_edite = st.data_editor(
+            df_style,
+            row_height = row_height,
+            key=f"editeur_{article}",
+            column_order=["abrev_article", "lien_article", "amdt", "lien_amdt", "nom_groupe","objet", "com", "avis_com", "avis_gouv", "proposition_vote_amdt", "sort"],
+            column_config={
+                "abrev_article": st.column_config.TextColumn("Article", width= 75),
+                "lien_article": st.column_config.LinkColumn("", display_text="🔗", width=20),
+                "amdt": st.column_config.TextColumn("Amdt", width=100),
+                "lien_amdt": st.column_config.LinkColumn("", display_text="🔗", width=20),
+                "nom_groupe": st.column_config.TextColumn("Auteur·rice", width=140),
+                "objet": st.column_config.TextColumn("Objet", width=240),
+                "avis_gouv": st.column_config.TextColumn("Avis gouv", width=110),
+                "avis_com": st.column_config.TextColumn("Avis com", width=110),
+                "proposition_vote_amdt": st.column_config.SelectboxColumn("Prop. vote", options=OPTIONS, width=110),
+                "sort": st.column_config.TextColumn("Sort", width=100),
+            },
+            disabled=["article", "lien_article", "amdt", "lien_amdt", "nom_groupe","avis_gouv", "avis_com", "sort"],
+            hide_index=True,
+            height = hauteur_tab,
+            width="stretch",
+        )
+        editeurs.append((df_by_article, df_edite))
+
+    # AFFICHAGE DU VOTE (pas pour les articles additionnels)
+    if not est_additionnel:
+        col_vote, col_droite = st.columns(2)
+        with col_vote:
+            with st.container(horizontal=True):
+                st.write(f"Vote sur l'{libelle}")
+                col, _ = st.columns([1, 1])
+                with col:
+                    vote_actuel = dict_votes_articles.get(str(article))
+                    votes[article] = st.selectbox(
+                        f"vote-{article}",
+                        OPTIONS,
+                        index=OPTIONS.index(vote_actuel) if vote_actuel in OPTIONS else None,
+                        placeholder="Sélectionner un vote",
+                        key=f"vote_{article}",
+                        label_visibility="collapsed",
                         )
     st.space("xlarge")
 

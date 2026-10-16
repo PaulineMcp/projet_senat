@@ -1,8 +1,5 @@
 README
 
-Mdp serveur perso : P3Dr6yJk928
-
-
 LES scripts
 Dans le dossier pages, se trouvent tous les scripts qui permettent de générer les pages web
 

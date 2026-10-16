@@ -1,5 +1,4 @@
 -- Code pour créer la BDD
--- Code pour créer la table discussion (il faudrait la renommer en PPL_PJL)
 CREATE TABLE discussion(
     id_disc TEXT PRIMARY KEY,
     url_disc TEXT NOT NULL UNIQUE,
@@ -27,19 +26,13 @@ CREATE TABLE amdts(
     amdt TEXT NOT NULL,
     is_ss_amdt TEXT NOT NULL,
     lien_amdt TEXT,
-    url_senateur TEXT NOT NULL,
+    url_senateur TEXT,
     sort TEXT DEFAULT 'NA'
 );
 
 CREATE TABLE ordre_examen(
     ordre_amdt INT NOT NULL,
     id_amdt TEXT PRIMARY KEY
-);
-
--- TEST --
-CREATE TABLE ordre_examen(
-    ordre_amdt INT NOT NULL,
-    id_amdt TEXT
 );
 
 CREATE TABLE avis(

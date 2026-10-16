@@ -15,7 +15,7 @@ OPTIONS = ["🟢 Pour", "🟡 Plutôt pour", "🟠 Plutôt contre", "🔴 Contre
 from fonctions.get_tab_to_aff import retrieve_tab
 from fonctions.fonctions_cleaning import abrev_article
 from fonctions.fonctions_affichage import couleur_sort
-from fonctions.get_tab_to_aff import get_row_height
+from fonctions.fonctions_affichage import get_row_height
 from utils import get_conn
 
 ###############     STYLE     ###############

@@ -60,6 +60,34 @@ def maj_avis():
         conn.close()
 
 #############       APPELS       ##############
+import sqlite3
+import traceback
 
-maj_avis()
-print("Avis com et avis gouv de toutes les discussions maj !")
+DB_PATH = ROOT / "bdd.db"   # à vérifier : le chemin de votre base
+
+class ConnexionUnique(sqlite3.Connection):
+    """Connexion partagée : les commit() et close() des fonctions ne font rien."""
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+connexion = sqlite3.connect(DB_PATH, factory=ConnexionUnique, timeout=30)
+get_conn = lambda: connexion   # les fonctions utilisent maintenant cette connexion
+
+try:
+    maj_avis()
+    print("Avis gouv et com maj !")
+
+    sqlite3.Connection.commit(connexion)
+    print("Tout est enregistré")
+
+except Exception:
+    connexion.rollback()
+    print("Erreur : aucune modification enregistrée")
+    traceback.print_exc()
+
+finally:
+    sqlite3.Connection.close(connexion)

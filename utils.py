@@ -10,4 +10,4 @@ print(DB_PATH)
 
 # Connection à la BDD
 def get_conn():
-    return sqlite3.connect(DB_PATH, timeout=10)
+    return sqlite3.connect(DB_PATH, timeout=30)
