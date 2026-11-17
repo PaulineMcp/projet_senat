@@ -17,6 +17,13 @@ def couleur_sort(val):
             return "background-color: #1b1e3b; color: #ffffff"
     return ""
 
+def couleur_parti(val):
+    if  "(GEST)" in str(val) :
+        return "background-color: #079C63; color: #ffffff"
+    # gérer l'affichage si c'est le gouvernement
+    else :
+        return ""
+
 def get_row_height(df, colonnes_largeurs) :
     PX_PAR_CARACTERE = 7      # largeur moyenne d'un caractère
     PX_PAR_LIGNE = 22         # hauteur d'une ligne de texte

@@ -1,17 +1,18 @@
-# Pour gérer la navigation
-import streamlit as st
+# Gestion de la navigation
+from utils import *
 
-accueil = st.Page("pages/accueil.py", title="Accueil", default=True) # à quoi sert le default ici ??
+accueil = st.Page("pages/accueil.py", title="Accueil", default=True)
 creer_discussion = st.Page("pages/creer_discussion.py", title = "Créer une discussion")
 recherche = st.Page("pages/recherche.py", title="Recherche")
 discussions = st.Page("pages/discussions.py", title="Discussions")
 afficher_tab_amdts = st.Page("pages/afficher_tab_amdts.py", title="Afficher tab amdts")
 vue_seule_tab_amdts = st.Page("pages/vue_seule_tab_amdts.py", title="Afficher tab amdts vue seule")
+tutoriel = st.Page("pages/tutoriel.py", title="Tutoriel")
+
+pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts, tutoriel])
 
 # Header
-
 st.set_page_config(layout="wide")
-
 st.markdown(
     """
     <style>
@@ -41,12 +42,5 @@ with st.container(key="header_site", horizontal=True, vertical_alignment="center
             st.switch_page("pages/accueil.py")
     with col_titre : 
         st.markdown('<p style="font-size:30px;">Suivi des amendements du Sénat</p>', unsafe_allow_html=True)
-
-
-pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts])
-
-##### STYLE
-
-
-print("LANCEMENT NEW")
+        
 pg.run()

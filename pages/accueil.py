@@ -22,18 +22,6 @@ with col_centre :
 
         st.space("large")
 
-        # Style des boutons
-        st.markdown("""
-        <style>
-        .st-key-boutons_navigation div.stButton > button {
-        height: 80px;
-        width: 100%;
-        white-space: normal;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True)
-
         with st.container(key="boutons_navigation"):
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -47,3 +35,13 @@ with col_centre :
             with col3:
                 if st.button("Voir la liste complète des tableaux déjà créés",wrap = True):
                     st.switch_page("pages/discussions.py")
+
+    st.space("large")
+    with st.container():
+        col1, col2,col3 = st.columns([1,1,1])
+        with col2:
+            with st.container(horizontal= True, vertical_alignment="center"):
+                st.write("Besoin d'aide ?")
+                if st.button("Voir le tutoriel", width="stretch") :
+                                st.switch_page("pages/tutoriel.py")
+            

@@ -13,185 +13,230 @@
     """
 
 ###############     IMPORTS     ###############
-
- # Chemin de la racine pour trouver les autres fichiers
-import sys
+###############     IMPORTS LIBRAIRIES ET FONCTIONS     ###############
 from pathlib import Path
+import sqlite3
+import streamlit as st 
+import sys
+import hashlib
+import re
+import requests
+from bs4 import BeautifulSoup
 import pandas as pd
+import unicodedata
 
 # Constantes
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# Imports des fonctions
-from fonctions.fonctions_cleaning import commission_ou_sceance
-from fonctions.fonctions_cleaning import get_id_disc
-from fonctions.fonctions_scrapping import get_content_page
-from fonctions.fonctions_scrapping import get_lecture
-from fonctions.fonctions_cleaning import get_session
-from fonctions.fonctions_cleaning import get_id_article
-from fonctions.fonctions_cleaning import get_id_bloc_article
-from fonctions.fonctions_scrapping import get_tab
-from fonctions.fonctions_scrapping import clean_tab_ordre
-from fonctions.fonctions_cleaning import get_id_amdt
-from fonctions.fonctions_cleaning import is_ss_amdt
-from fonctions.fonctions_scrapping import clean_amdt_info
-from fonctions.fonctions_scrapping import get_avis_com
-from fonctions.fonctions_scrapping import get_avis_gouv
+from fonctions.fonctions_cleaning import get_id_disc, get_session, get_id_article, get_id_bloc_article, get_id_amdt, is_ss_amdt, get_info_from_id, turn_into_content, turn_into_ordre, get_url_article, get_bloc_article
+from fonctions.fonctions_scrapping import get_content_page, get_hash, get_tab_list, get_disc_info, parsing_line, get_avis_gouv, get_avis_com
+#get_avis_com, get_avis_gouv, get_tab_content
 from utils import get_conn
 
 ###############     DISCUSSION      ###############
-
 # Récupérer les infos principales de la discussion
-def get_disc_info(url): # URL de la discussion                 
-    com_seance = commission_ou_sceance(url)
-    id_disc = get_id_disc(url)
-    lecture = get_lecture(get_content_page(url))
-    session = get_session(url)
-    
-
-    raw_com_seance = "COM" if com_seance == "Commission" else "SCE"
-    id_disc = session + "-" + raw_com_seance + "-" + id_disc
-    return{
-            "com_seance" : com_seance,
-            "id_disc" : id_disc,
-            "lecture" : lecture,
-            "session" : session 
-    }
 
 # Initialiser la discussion
-def fetch_disc(url, inputs) :
+def fetch_disc(url : str, inputs : dict) :
+
         # Récupère les infos principales du ppl/pjl
         infos = get_disc_info(url)
 
-        id_disc = infos["id_disc"]
-        com_seance = infos["com_seance"]
-        lecture = infos["lecture"]
-        session = infos["session"]
-
-        # Récupère les infos sur le ppj/ppl qui viennent des inputs
-        titre_disc = inputs["titre"]
-        url_disc = inputs["url"]
-        lien_note = inputs["lien_note"]
-        lien_dossier = inputs["lien_dossier"]
-        url_articles = inputs["url_articles"]
-
-        titre_disc_long = titre_disc + " - " + com_seance + " - " + lecture + " - " + session
-
-        # rajoute la discussion aux discussions existantes
+        titre_disc_long = inputs["titre"] + " - " + infos["com_seance"] + " - " + infos["lecture"] + " - " + infos["session"]
+        nb_parties = len(get_tab_list(url))
+        last_hash = get_hash(url)
+        is_archived = 0
+        
+        # Rajoute la discussion aux discussions existantes
         conn = get_conn()
+
+        
         conn.execute(
                 """
                 INSERT INTO discussion
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                id_disc,
-                url_disc,
-                titre_disc,
+                infos["id_disc"],
+                inputs["url"],
+                inputs["titre"],
                 titre_disc_long,
-                com_seance,
-                lecture,
-                lien_note.strip(),
-                lien_dossier.strip(),
-                url_articles,
+                nb_parties,
+                infos["com_seance"],
+                infos["lecture"],
+                last_hash,
+                inputs["lien_note"].strip(),
+                inputs["lien_dossier"].strip(),
+                inputs["url_txt"],
+                is_archived
                 ),
         )
+        print("Discussion ajoutée à la BDD")
         conn.commit()
         conn.close()
+
+###################
+
+# Fonction pour récupérer les infos dans la page
+def fetch_content(id_disc : str) :
+    soup = get_content_page(get_info_from_id(id_disc, "url_disc"))
+    nb_parties = get_info_from_id(id_disc, "nb_parties")
+    df_parties = []
+
+    if nb_parties == 1 :
+
+        df_parties.append({
+            "id_partie" : id_disc + "-p1", # pour "partie unique"
+            "id_disc" : id_disc,
+            "titre_partie" : "Première et unique partie",
+            "ordre_partie" : 1
+            })      
+
+        tbody = soup.find("tbody")
+        lines = tbody.find_all("tr")
+
+        df = []
+        for line in lines :
+            parsed_line = parsing_line(line)
+            df.append(parsed_line)
+        df = pd.DataFrame(df)
+        df_ordre = turn_into_ordre(df,id_disc,1)
+        df_content = turn_into_content(df,id_disc,1)        
+ 
+    else :
+        tables = soup.find_all("table")
+
+        df_ordre = pd.DataFrame(columns = ["id_amdt", "id_partie","ordre_examen_in_partie"])
+        df_content = pd.DataFrame(columns = ["id_amdt","id_article","id_partie","amdt","is_ss_amdt","lien_amdt","auteur","url_senateur","sort"])
+        ordre = 1
+
+        for table in tables :
+            df_tmp = []
+            # Récupérer le titre de la partie
+            titre = table.find_previous("h5")
+            titre = titre.text.strip()
+            df_parties.append({
+                "id_partie" : id_disc + "-p" + str(ordre),
+                "id_disc" : id_disc,
+                "titre_partie" : titre.capitalize(),
+                "ordre_partie" : ordre
+                })
+    
+            # Récupérer les amendements et leur contenu par partie
+            tbody = table.find("tbody")
+            lines = tbody.find_all("tr")
+            for line in lines :
+                parsed_line = parsing_line(line)
+                df_tmp.append(parsed_line)
+
+            df_tmp = pd.DataFrame(df_tmp)
+
+            df_ordre_tmp = turn_into_ordre(df_tmp, id_disc, ordre)
+            df_content_tmp = turn_into_content(df_tmp, id_disc, ordre)
+
+            df_ordre = pd.concat([df_ordre, df_ordre_tmp], ignore_index=True, sort=False)
+            df_content = pd.concat([df_content, df_content_tmp], ignore_index=True, sort=False) 
+             
+            ordre += 1
+
+    df_parties = pd.DataFrame(df_parties) 
+    df_ordre["ordre_examen_abs"] = df_ordre.index
+    # Renvoyer le résultat en base de données
+    conn = get_conn()
+    df_parties.to_sql("parties", conn, if_exists="append", index = False)
+    df_ordre.to_sql("ordre_examen", conn, if_exists="append", index = False)
+    df_content.to_sql("amdts", conn, if_exists="append", index = False)
+    conn.commit()
+    print("Contenu, ordre et parties ajoutés")
+    conn.close()
+
+#fetch_content("2024-2025-SCE-62")
+#fetch_content("2025-2026-SCE-138")
+#fetch_content("2025-2026-COM-689")
+#fetch_content("2026-2027-SCE-138")
+
 
 ###############     ARTICLES        ###############
 
-def fetch_articles(id_disc) :
-
-    # On récupère l'url du texte
-    conn = get_conn()
-    # On récupère l'url du texte de la disc
-    df = pd.read_sql("""
-                    SELECT url_articles
-                    FROM discussion
-                    WHERE id_disc = ?
-                    """,
-                    conn,
-                    params=(id_disc,))
-
-    url_articles = df.iloc[0, 0]
+def fetch_articles_from_texte(id_disc : str) : 
+    # Récupère l'url du texte
+    url_articles = get_info_from_id(id_disc, "url_txt")
+    #print(url_articles)
     soup = get_content_page(url_articles)
     articles = soup.find_all("p", {"class": "TCNumArticle"})
 
-    df_articles = []
+    # Parsing
+    df = []
     for article in articles :
-        article = article.text.strip()
-        id_bloc_article = get_id_bloc_article(article, id_disc)
-        id_article = get_id_article(article, id_disc)
-        row = {
-            "id_article" : id_article,
-            "id_bloc_article" : id_bloc_article,
-            "id_disc" : id_disc,
-            "article" : article
-        }
-        df_articles.append(row)
-    
-    df_articles = pd.DataFrame(df_articles)
-    df_articles["ordre_article"] = df_articles.index
-    print(df_articles)
+        try :
+            lien_article = url_articles + "#" + article.find("a")["id"]
+        except : 
+            lien_article = "Pas de lien vers l'article"
 
-    # Renvoyer le résultat en base de données
-    df_articles.to_sql("articles", conn, if_exists="append", index = False)
+        article_texte = re.sub(r"\([^()]*\)", "", article.text.strip()).strip()
+        id_article = id_disc + "-" + get_id_article(article_texte)
+        id_bloc_article = id_disc + "-" + get_id_bloc_article(article_texte)
+        df.append({
+            "id_bloc_article" : id_bloc_article,
+            "bloc_article" : get_bloc_article(article_texte),
+            "bloc" : get_id_bloc_article(article_texte),
+            "id_article" : id_article,
+            "article" : article_texte,
+            "lien_article" : lien_article,
+            "id_disc" : id_disc
+        })
+    df = pd.DataFrame(df).drop_duplicates()
+    print(df)
+    return(df)
+
+
+#fetch_articles_from_texte("2024-2025-SCE-62")
+#fetch_articles_from_texte("2025-2026-SCE-138")
+#fetch_articles_from_texte("2025-2026-COM-689")
+#fetch_articles_from_texte("2026-2027-SCE-138")
+
+def fetch_articles_from_amdts(id_disc : str) :
+    conn = get_conn()
+    requete = f"""SELECT amdts.id_article, amdts.article, amdts.lien_article
+                FROM amdts 
+                LEFT JOIN parties
+                ON parties.id_partie = amdts.id_partie
+                LEFT JOIN discussion
+                ON discussion.id_disc = parties.id_disc
+                WHERE discussion.id_disc = '{id_disc}'"""
+    df = pd.read_sql(requete, conn,).drop_duplicates()
+    df["id_bloc_article"] = id_disc + "-" + df["article"].apply(lambda x : get_id_bloc_article(x)) 
+    df["bloc_article"] = df["article"].apply(lambda x : get_bloc_article(x))
+    df["id_disc"] = id_disc
+    df["bloc"] = df["article"].apply(lambda x : get_id_bloc_article(x))
+    df = df[["id_bloc_article", "bloc_article", "bloc","id_article", "article","lien_article","id_disc"]]
+    print(df)
+    return(df)
+
+#fetch_articles_from_amdts("2024-2025-SCE-62")
+#fetch_articles_from_amdts("2025-2026-SCE-138")
+#fetch_articles_from_amdts("2025-2026-COM-689")
+#fetch_articles_from_amdts("2026-2027-SCE-138")  
+
+def fetch_all_articles(id_disc : str) :
+    df_art_from_amdts = fetch_articles_from_amdts(id_disc)
+    df_art_from_txt = fetch_articles_from_texte(id_disc)
+    df = pd.concat([df_art_from_amdts,df_art_from_txt])
+    df["article"] = df["article"].map(lambda s: " ".join(unicodedata.normalize("NFKC", s).split()))
+    df = df.drop_duplicates(subset=["id_bloc_article","bloc_article","bloc","id_article","id_disc"], keep="first")
+
+    # Renvoyer en bdd
+    conn = get_conn()
+    df.to_sql("articles", conn, if_exists="append", index = False)
     conn.commit()
+    print("Articles ajoutés dans la bdd")
     conn.close()
 
-## Fonction pour intialiser l'ordre d'examen des amendements d'un seul pjl
-def fetch_ordre_amdts(url) : # on lui passe l'url d'un unique pjl
-    tab = get_tab(url)
-    df = clean_tab_ordre(tab)
-    df["session"] = get_session(url)    
-    df["id_disc"] = get_id_disc(url)
-    df["com_seance"] = commission_ou_sceance(url)
-    df["id_amdt"] = df["amdt"].apply(lambda x : get_id_amdt(x))
-    df["raw_com_seance"] = "COM" if df["com_seance"][0] == "Commission" else "SCE"
-
-    df["id_disc"] = df["session"] + "-" + df["raw_com_seance"] + "-" + df["id_disc"]
-    df["id_article"] = df.apply(lambda x: get_id_article(x.article, x.id_disc), axis=1)
-    df["id_amdt"] = df["id_article"] + "-"+ df["id_amdt"]
-    df["ordre_amdt"] = df.index
-    df = df[["ordre_amdt","id_amdt"]]
-
-    # Renvoyer les nouvelles données dans la table ordre_examen       
-    conn = get_conn()
-    df.to_sql("ordre_examen", conn, if_exists="append", index = False)
-    conn.commit()
-    conn.close()  
-
-## Fonction pour intialiser le contenu des amendements d'un seul pjl
-def fetch_content_amdts(url) :
-        
-        # Récupère la liste des amdts dans ordre_examen
-        tab = get_tab(url)
-        df = clean_amdt_info(tab)
-        df["session"] = get_session(url)
-        df["id_disc"] = get_id_disc(url)
-        df["com_seance"] = commission_ou_sceance(url)
-        racine_lien = "https://www.senat.fr/amendements/commissions/" if df["com_seance"][0] == "Commission" else "https://www.senat.fr/amendements/"
-        df["lien_amdt"] = racine_lien + df["session"] + "/" + df["id_disc"] + "/" + df["lien_amdt"]
-        df["raw_com_seance"] = "COM" if df["com_seance"][0] == "Commission" else "SCE"
-        df["id_disc"] = df["session"] + "-" + df["raw_com_seance"] + "-" + df["id_disc"]
-
-        # Génération de la clé
-        df["id_article"] = df.apply(lambda x: get_id_article(x.article, x.id_disc), axis=1)
-        df["id_bloc_article"] = df.apply(lambda x: get_id_bloc_article(x.article, x.id_disc), axis=1)
-        df["id_amdt"] = df["amdt"].apply(lambda x : get_id_amdt(x))
-        df["id_amdt"] = df["id_article"] + "-"+ df["id_amdt"]
-
-        df["is_ss_amdt"] = df["amdt"].apply(lambda x: is_ss_amdt(x))
-
-        df = df[["id_amdt","id_article","id_bloc_article","amdt","is_ss_amdt","lien_amdt","url_senateur","sort"]]
-        # Renvoyer les nouvelles données dans la table ordre_examen       
-        conn = get_conn()
-        df.to_sql("amdts", conn, if_exists="append", index = False)
-        conn.commit()
-        conn.close()
-
+fetch_all_articles("2024-2025-SCE-62")
+fetch_all_articles("2025-2026-SCE-138")
+fetch_all_articles("2025-2026-COM-689")
+fetch_all_articles("2026-2027-SCE-138")   
 
 ############        AVIS        ##############
 
@@ -201,27 +246,32 @@ def fetch_avis(id_disc): # on initialise les avis pour un ppl / pjl
 
     # On récupère la liste de tous les amdts pour une disc
     df = pd.read_sql("""
-                    SELECT *
+                    SELECT amdts.id_amdt, amdts.lien_amdt
                     FROM amdts 
-                    LEFT JOIN articles
-                    ON amdts.id_bloc_article = articles.id_bloc_article
+                    LEFT JOIN parties
+                    ON parties.id_partie = amdts.id_partie
                     LEFT JOIN discussion
-                    ON articles.id_disc = discussion.id_disc
+                    ON discussion.id_disc = parties.id_disc
                     WHERE discussion.id_disc = ?
                     """,
                     conn,
                     params = (id_disc,))
 
-    com_ou_seance = df["com_seance"].iloc[0] == "Commission"
-
-    # Récupérer les avis gouv et com   
-    df["avis_com"] = "Pas d'avis" if com_ou_seance == True else df["lien_amdt"].apply(lambda x : get_avis_com(x))
-    df["avis_gouv"] = "Pas d'avis" if com_ou_seance == True else df["lien_amdt"].apply(lambda x : get_avis_gouv(x))
-    
+    com_ou_seance = get_info_from_id(id_disc, "com_seance")
+    # Récupérer les avis gouv et com
+    df["avis_com"] = "Pas d'avis" if com_ou_seance == "Commission" else df["lien_amdt"].apply(lambda x : get_avis_com(x))
+    df["avis_gouv"] = "Pas d'avis" if com_ou_seance == "Commission" else df["lien_amdt"].apply(lambda x : get_avis_gouv(x))
     df = df[["id_amdt","avis_gouv", "avis_com"]]
+    print(df)
     df.to_sql("avis", conn, if_exists="append", index = False)
     conn.commit()
+    print("Avis ajoutés à la BDD")
     conn.close()
+
+#fetch_avis("2024-2025-SCE-62")
+#fetch_avis("2025-2026-SCE-138")
+#fetch_avis("2025-2026-COM-689")
+#fetch_avis("2026-2027-SCE-138")  
 
 ###############     REMPLISSAGE AP DES AMDTS        ###############
 
@@ -231,22 +281,27 @@ def init_remplissage_amdts(id_disc) :
     df = pd.read_sql("""
                     SELECT amdts.id_amdt         
                     FROM amdts 
-                    LEFT JOIN articles
-                    ON amdts.id_bloc_article = articles.id_bloc_article
+                    LEFT JOIN parties
+                    ON parties.id_partie = amdts.id_partie
                     LEFT JOIN discussion
-                    ON articles.id_disc = discussion.id_disc
+                    ON discussion.id_disc = parties.id_disc
                     WHERE discussion.id_disc = ?
                     """,
                     conn,
                     params=(id_disc,))
-
     # Rajouter les objets et commentaires actuellement vide
-    df["objet"] = "A compléter"
+    df["objet"] = "À compléter"
     df["com"] = ""
-    df["proposition_vote_amdt"] = "A définir"            
+    df["proposition_vote_amdt"] = "À définir"            
     df.to_sql("remplissage_ap_amdt", conn, if_exists="append", index = False)
+    print("Initialisation des commentaires amdt")
     conn.commit()
     conn.close() 
+
+#init_remplissage_amdts("2024-2025-SCE-62")
+#init_remplissage_amdts("2025-2026-SCE-138")
+#init_remplissage_amdts("2025-2026-COM-689")
+#init_remplissage_amdts("2026-2027-SCE-138")
 
 ###############     REMPLISSAGE AP DES ARTICLES     ###############
 
@@ -255,18 +310,22 @@ def init_remplissage_articles(id_disc) :
 
     # On récupère la liste de tous les articles pour une disc
     df = pd.read_sql("""
-                    SELECT articles.id_article
+                    SELECT id_article
                     FROM articles
-                    LEFT JOIN discussion
-                    ON discussion.id_disc = articles.id_disc
-                    WHERE discussion.id_disc = ?
+                    WHERE id_disc = ?
                     """,
                     conn,
                     params=(id_disc,))
-    
     # Rajouter les propositions de vote
     df["resume_article"] = None
     df["proposition_vote_article"] = None
     df.to_sql("remplissage_ap_article", conn, if_exists="append", index = False)
+    print("Initialisation des commentaires articles")
     conn.commit()
     conn.close()
+
+#init_remplissage_articles("2024-2025-SCE-62")
+#init_remplissage_articles("2025-2026-SCE-138")
+#init_remplissage_articles("2025-2026-COM-689")
+#init_remplissage_articles("2026-2027-SCE-138")
+   

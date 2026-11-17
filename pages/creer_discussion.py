@@ -3,33 +3,18 @@
 ###############     IMPORTS     ###############
 
 # Import des librairies
-import streamlit as st 
-from pathlib import Path
-import sys
-
-# Chemin de la racine pour trouver les autres fichiers
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+from utils import *
 
 # Fonctions
-from fonctions.fonctions_checking import url_valide
-from fonctions.fonctions_checking import disc_already_exist
-from fonctions.fonctions_checking import is_not_google_doc
-
-from fonctions.fonctions_cleaning import commission_ou_sceance
-from fonctions.fonctions_cleaning import get_session
-from fonctions.fonctions_cleaning import get_id_disc
-from fonctions.fonctions_cleaning import get_url_articles
-
+from fonctions.fonctions_checking import url_valide, disc_already_exist, is_not_google_doc
+from fonctions.fonctions_cleaning import commission_ou_sceance, get_session, get_id_disc, get_url_articles
 from fonctions.fonctions_scrapping import check_url
-
-from fonctions.init_discussion import fetch_disc
-from fonctions.init_discussion import fetch_articles
-from fonctions.init_discussion import fetch_ordre_amdts
-from fonctions.init_discussion import fetch_content_amdts
-from fonctions.init_discussion import fetch_avis
-from fonctions.init_discussion import init_remplissage_amdts
-from fonctions.init_discussion import init_remplissage_articles
+from fonctions.init_discussion import fetch_disc, fetch_content, fetch_all_articles, init_remplissage_amdts, init_remplissage_articles
+#from fonctions.init_discussion import fetch_ordre_amdts
+#from fonctions.init_discussion import fetch_content_amdts
+#from fonctions.init_discussion import fetch_avis
+#from fonctions.init_discussion import init_remplissage_amdts
+#from fonctions.init_discussion import init_remplissage_articles
 
 ###############     PAGE    ###############
 
@@ -41,7 +26,7 @@ with col_centre :
         titre = st.text_input("Titre du PJL ou de la PPL", placeholder="exemple : PPL régime d'indemnisation des catastrophes naturelles")
         url_disc = st.text_input("Lien vers la page amendements", placeholder="exemple : https://www.senat.fr/amendements/commissions/2025-2026/689/liste_discussion.html")
         lien_dossier = st.text_input("Lien vers le dossier législatif", placeholder="exemple : https://www.senat.fr/dossier-legislatif/ppl23-612.html")
-        lien_note = st.text_input("Lien vers le Google doc de la note du groupe")
+        lien_note = st.text_input("Lien vers le Google Doc de la note du groupe")
 
         # Bouton pour soumettre
         submit = st.form_submit_button("Créer")
@@ -58,14 +43,6 @@ with col_centre :
                 lien_note = lien_note.strip()
                 lien_dossier = lien_dossier.strip()
 
-                inputs = {
-                    "titre" : titre,
-                    "url" : url_disc,
-                    "lien_note" : lien_note,
-                    "lien_dossier" : lien_dossier,
-                    "url_articles" : get_url_articles(url_disc)
-                    }
-
                 # Gestion des erreurs
                 if not titre : 
                     erreurs.append("Le titre est obligatoire.")
@@ -80,7 +57,7 @@ with col_centre :
                 if is_not_google_doc(lien_note) :
                     erreurs.append("La note n'est pas un Google Doc")
                 if disc_already_exist(url_disc) == True :
-                    erreurs.append("Cette discussion est déjà surveillée")
+                    erreurs.append("Ce tableau existe déjà")
                         
                 # Affichage des erreurs
                 if erreurs : 
@@ -89,47 +66,38 @@ with col_centre :
                         st.stop()
 
                 else :
+
+                    inputs = {
+                    "titre" : titre,
+                    "url" : url_disc,
+                    "lien_note" : lien_note,
+                    "lien_dossier" : lien_dossier,
+                    "url_txt" : get_url_articles(url_disc)
+                    }
+
                     # Identifier l'id de la discussion
                     session = get_session(url_disc)
                     com_seance = commission_ou_sceance(url_disc)
                     raw_com_seance = "COM" if com_seance == "Commission" else "SCE"
                     id_disc = session + "-" + raw_com_seance + "-" + get_id_disc(url_disc)
-                    print(f"ID DISCUSSION : {id_disc}")
+                    print(f"id discussion : {id_disc}")
 
-                    # Initiatilisation de la discussion dans la table discussion
-                    print("TENTATIVE AJOUT DISCUSSION")
+                    print(inputs)
+
                     fetch_disc(url_disc, inputs)
-                    print("DISCUSSION AJOUTEE !")
-
-                    # Initialisation des titres et des articles dans leurs tables respectives
-                    print("TENTATIVE RECUP ARTICLES")
-                    fetch_articles(id_disc)
-                    print("ARTICLES RECUPERES")                  
-
-                    # Initialise l'ordre des amdts dans la table ordre_examen
-                    print("TENTATIVE RECUP ORDRE AMDTS")
-                    fetch_ordre_amdts(url_disc)
-                    print("ORDRE AMDTS RECUPERES !")
+                    #fetch_content(id_disc)
                     
-                    # Initialise le contenu des amdt dans la table admts
-                    print("TENTATIVE RECUP CONTENU AMDTS")
-                    fetch_content_amdts(url_disc)
-                    print("CONTENU DES AMDTS RECUPERE !")
+                    #fetch_all_articles(id_disc)
+                    #print("articles récupérés")
+                  
 
-                    # Initialiser les avis dans la table avis
-                    print("TENTATIVE RECUP AVIS")
-                    fetch_avis(id_disc)
-                    print("AVIS RECUPERES")
+                    #fetch_avis(id_disc)
+                    #print("AVIS RECUPERES")
 
-                    # Initialisation des cases objets, commentaires et vote des amdts
-                    print("TENTATIVE INIT OBJET ET COM")
-                    init_remplissage_amdts(id_disc)
-                    print("INIT OBJET ET COM")
-
-                    # Initialisation des cases resumes et votes des articles
-                    print("TENTATIVE INIT VOTES")
-                    init_remplissage_articles(id_disc)
-                    print("INIT VOTES")
+                    #init_remplissage_amdts(id_disc)
+                    #print("OBJET ET COM INITIALISES")
+                    #init_remplissage_articles(id_disc)
+                    #print("VOTES INITIALISES")
                     st.success("Enregistré")
 
     st.space("large")

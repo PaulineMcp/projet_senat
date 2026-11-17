@@ -18,50 +18,47 @@ Liste des fonctions :
 import re
 import inspect
 import unicodedata
+import sys
+from pathlib import Path
+import pandas as pd
+from typing import Literal, Optional
+
+# Constantes
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from utils import get_conn
 
 ###############     FONCTIONS     ###############
-def get_id_disc(url_disc):
+def get_id_disc(url_disc : str):
     if commission_ou_sceance(url_disc) == "Commission":
         id = url_disc[55:].replace("/liste_discussion.html","")
     else :
         id = url_disc[43:].replace("/liste_discussion.html","")
     return(id)
 
-def get_id_amdt(amdt):
+def get_id_amdt(amdt : str):
     amdt = amdt.replace("\n","")
-    digits = amdt.replace("Amt n° ","")
-    digits = digits.replace("Motion n° ","")
-    if "rect. decies" in amdt:
-        id_amdt = digits.replace(" rect. decies","") + "rdc"
-    elif "rect. nonies" in amdt:
-        id_amdt = digits.replace(" rect. nonies","") + "rnn"
-    elif "rect. octies" in amdt:
-        id_amdt = digits.replace(" rect. octies","") + "roc"
-    elif "rect. septies" in amdt:
-        id_amdt = digits.replace(" rect. septies","") + "rsp"
-    elif "rect. sexties" in amdt:
-        id_amdt = digits.replace(" rect. sexties","") + "rsx"
-    elif "rect. quinquies" in amdt:
-        id_amdt = digits.replace(" rect. quinquies","") + "rqq"
-    elif "rect. quater" in amdt:
-        id_amdt = digits.replace(" rect. quater","") + "rqt"
-    elif "rect. ter" in amdt:
-        id_amdt = digits.replace(" rect. ter","") + "rt"
-    elif "rect. bis" in amdt:
-        id_amdt = digits.replace(" rect. bis","") + "rb"
-    elif "rect." in amdt:
-        id_amdt = digits.replace(" rect.","") + "r"      
-    else : 
-        id_amdt = digits  
+    amdt = amdt.replace("S/Amt ","s/a").replace("n°","").strip()
+    amdt = amdt.replace("Amt","").replace("n°","").strip()  
+    id_amdt = amdt.replace("Motion","").strip()
+    multiplicatifs = {"rect. decies": "rdc", "rect. nonies": "rnn", "rect. octies": "roc", "rect. septies": "rsp", "rect. sexies": "rsx", "rect. quinquies": "rqq", "rect. quater": "rqt", "rect. ter": "rt", "rect. bis": "rb", "rect.": "r"}
+    for cle, code in multiplicatifs.items():
+        if cle in amdt:
+            id_amdt = amdt.replace(cle,"").replace(" ","")
+            break
     return(id_amdt)
 
-def commission_ou_sceance(url_pjl) :
+#TEST
+#print(get_id_amdt("Amt n° I-42 rect. bis"))
+
+def commission_ou_sceance(url_pjl : str) :
     if "commission" in url_pjl:
         return("Commission")
     else:
         return("Séance")
      
-def get_session(url):
+def get_session(url : str ):
     if commission_ou_sceance(url) == "Commission" :
         session = url[45:54]
     else :
@@ -74,147 +71,154 @@ def is_ss_amdt(amdt):
     else :
         return False
 
-def abrev_article(article):  
-    prefixe = ""
-    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article)) # produit une liste de chiffre
-    suffixe = ""
-    if "decies" in article:
-        suffixe = "decies"
-    if "nonies" in article:
-        suffixe = "nonies"
-    if "octies" in article:
-        suffixe = "octies"
-    if "septies" in article:
-        suffixe = "septies"
-    if "sexties" in article:
-        suffixe = "sexties"
-    if "quinquies" in article:
-        suffixe = "quinquies"
-    if "quater" in article:
-        suffixe = "quater"
-    if "ter" in article:
-        suffixe = "ter"
-    if "bis" in article:
-        suffixe = "bis"  
+def abrev_article(article : str):
+    multiplicatif = ["bis", "ter", "quater", "quinquies", "sexies", "septies", "octies", "nonies", "decies", "undecies", "duodecies", "terdecies", "quaterdecies", "quindecies", "sexdecies", "septdecies", "octodecies", "novodecies", "vicies", "unvicies", "duovicies", "tervicies", "quatervicies", "quinvicies", "sexvicies", "septvicies", "octovicies", "novovicies", "tricies", "untricies", "duotricies", "tertricies", "quatertricies", "quintricies", "sextricies", "septtricies", "octotricies", "novotricies", "quadragies", "unquadragies", "duoquadragies", "terquadragies", "quaterquadragies", "quinquadragies", "sexquadragies", "septquadragies", "octoquadragies", "novoquadragies", "quinquagies", "unquinquagies", "duoquinquagies", "terquinquagies", "quaterquinquagies", "quinquinquagies", "sexquinquagies", "septquinquagies", "octoquinquagies", "novoquinquagies", "sexagies", "unsexagies", "duosexagies", "tersexagies", "quatersexagies", "quinsexagies", "sexsexagies", "septsexagies", "octosexagies", "novosexagies"]
+    prefixe = {"additionnel avant" : "Add av art.", "additionnel(s) avant" : "Add av art.", "additionnel après" : "Add ap art.", "additionnel(s) après" : "Add ap art.", "motion" : "Motion(s)", "liminaire" : "Art. lim "}
+    suffixe = {"état" : "Ét.", "annexe" : "Anx."}
+    
+    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
+    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
 
-    if "Motion" in article:
-        prefixe = "Motion "
-    elif "Lim. " in article:
-        prefixe = "Lim"
-    elif "additionnel avant" in article : 
-        prefixe = "Add av art. "
-    elif "additionnel(s) avant" in article : 
-        prefixe = "Add av art. "
-    elif "additionnel après" in article : 
-        prefixe = "Add ap art. "
-    elif "additionnel(s) avant" in article : 
-        prefixe = "Add av art. "
-    else : 
-        prefixe = "Art. "
-    abrev = prefixe + digits + " " + suffixe             
+    pref = "Art."
+    for cle,code in prefixe.items():
+        if cle in article :
+            pref = code
+            break
+            
+    mult = ""
+    for item in multiplicatif :
+        if item in re.findall(r"[a-zà-ÿ]+", article) :
+            mult = item
+            break
+
+    suf = ""
+    for cle,code in suffixe.items():
+        if cle in article :
+            if cle == "état" :
+                suf = code + article[-1].upper()
+                break
+            else : 
+                suf = code
+
+    abrev = pref + digits + mult + suf            
     return(abrev)
 
-def get_id_article(article, id_disc) :
-    article = unicodedata.normalize("NFKC", article)  # \xa0 = espace normal
-    article = " ".join(article.split())
+def get_id_article(article : str) :
 
-    if "additionnel(s) après" in article :
-        article = article.replace("Article(s) additionnel(s) après Article ","addap")
-    elif "additionnel(s) avant" in article :
-        article = article.replace("Article(s) additionnel(s) avant Article ","addav") 
-    else : 
-        article = article.replace("Article ","")
+    multiplicatif = {"bis": "b", "ter": "t", "quater": "qt", "quinquies": "qq", "sexies": "sx", "septies": "sp", "octies": "oc", "nonies": "nn", "decies": "dc", "undecies": "udc", "duodecies": "ddc", "terdecies": "tdc", "quaterdecies": "qtdc", "quindecies": "qdc", "sexdecies": "sxdc", "septdecies": "spdc", "octodecies": "odc", "novodecies": "ndc", "vicies": "vc", "unvicies": "uvc", "duovicies": "dvc", "tervicies": "tvc", "quatervicies": "qtvc", "quinvicies": "qvc", "sexvicies": "sxvc", "septvicies": "spvc", "octovicies": "ovc", "novovicies": "nvc", "tricies": "tc", "untricies": "utc", "duotricies": "dtc", "tertricies": "ttc", "quatertricies": "qttc", "quintricies": "qtc", "sextricies": "sxtc", "septtricies": "sptc", "octotricies": "otc", "novotricies": "ntc", "quadragies": "qc", "unquadragies": "uqc", "duoquadragies": "dqc", "terquadragies": "tqc", "quaterquadragies": "qtqc", "quinquadragies": "qqc", "sexquadragies": "sxqc", "septquadragies": "spqc", "octoquadragies": "oqc", "novoquadragies": "nqc", "quinquagies": "pc", "unquinquagies": "upc", "duoquinquagies": "dpc", "terquinquagies": "tpc", "quaterquinquagies": "qtpc", "quinquinquagies": "qpc", "sexquinquagies": "sxpc", "septquinquagies": "sppc", "octoquinquagies": "opc", "novoquinquagies": "npc", "sexagies": "sc", "unsexagies": "usc", "duosexagies": "dsc", "tersexagies": "tsc", "quatersexagies": "qtsc", "quinsexagies": "qsc", "sexsexagies": "sxsc", "septsexagies": "spsc", "octosexagies": "osc", "novosexagies": "nsc"}
+    prefixe = {"additionnel(s) après" : "addap",  "additionnel(s) avant" : "addav", "motion" : "mot", "liminaire" : "lim"}
+    suffixe = {"état" : "E", "annexe" : "anx"}
+    
+    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
+    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
+    texte = re.sub(r"\([^()]*\)", "", article).strip()
 
-    if "er" in article :
-        article = article.replace("er","")
-    if "(" in article :
-        article = re.sub(r" \(.*$", "", article, flags=re.DOTALL)
-    if "decies" in article:
-        article = article.replace(" decies","") + "dc"
-    if "nonies" in article:
-        article = article.replace(" nonies","") + "nn"
-    if "octies" in article:
-        article = article.replace(" octies","") + "oc"
-    if "septies" in article:
-        article = article.replace(" septies","") + "sp"
-    if "sexties" in article:
-        article = article.replace(" sexties","") + "sx"
-    if "quinquies" in article:
-        article = article.replace(" quinquies","") + "qq"
-    if "quater" in article:
-        article = article.replace(" quater","") + "qt"
-    if "ter" in article:
-        article = article.replace(" ter","") + "t"
-    if "bis" in article:
-        article = article.replace(" bis","") + "b"
-    id_article = id_disc + "-" + article
+    pref = ""
+    for cle,code in prefixe.items():
+        if cle in article :
+            pref = code
+            
+    mult = ""
+    for cle, code in multiplicatif.items():
+        m = re.search(rf"(?<![a-zà-ÿ]){cle}(?![a-zà-ÿ])(?:\s+([a-z])(?![a-zà-ÿ]))?", texte)
+        if m:
+            mult = code + (m.group(1).upper() if m.group(1) else "")
+            break
+
+    lettre = ""
+    if not mult:
+        m = re.search(r"\d+(?:er)?\s+([a-z])(?![a-zà-ÿ0-9])", texte)
+        if m:
+            lettre = m.group(1).upper()
+
+    suf = ""
+    for cle,code in suffixe.items():
+        if cle in article :
+            if cle == "état" :
+                suf = code + article[-1].upper()
+            else : 
+                suf = code
+
+    id_article = pref + digits + mult + lettre + suf
     return(id_article)
 
-def get_id_bloc_article(article, id_disc):
-    article = unicodedata.normalize("NFKC", article)
-    article = " ".join(article.split())
 
-    if "additionnel(s) après" in article :
-        article = article.replace("Article(s) additionnel(s) après Article ","")
-    elif "additionnel(s) avant" in article :
-        article = article.replace("Article(s) additionnel(s) avant Article ","") 
-    else : 
-        article = article.replace("Article ","")
+def get_id_bloc_article(article : str):   
+    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
+    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
+    return(digits)
 
-    if "er" in article :
-        article = article.replace("er","")
-    if "(" in article :
-        article = re.sub(r" \(.*$", "", article, flags=re.DOTALL)
-    if "decies" in article:
-        article = article.replace(" decies","") + "dc"
-    if "nonies" in article:
-        article = article.replace(" nonies","") + "nn"
-    if "octies" in article:
-        article = article.replace(" octies","") + "oc"
-    if "septies" in article:
-        article = article.replace(" septies","") + "sp"
-    if "sexties" in article:
-        article = article.replace(" sexties","") + "sx"
-    if "quinquies" in article:
-        article = article.replace(" quinquies","") + "qq"
-    if "quater" in article:
-        article = article.replace(" quater","") + "qt"
-    if "ter" in article:
-        article = article.replace(" ter","") + "t"
-    if "bis" in article:
-        article = article.replace(" bis","") + "b"
-    id_article = id_disc + "-" + article
-    return(id_article)
+def get_url_articles(url_disc : str):
+    try :
+        session = get_session(url_disc)
+        id_disc = get_id_disc(url_disc)
+        com_seance = commission_ou_sceance(url_disc)
+        url_base = "https://www.senat.fr/amendements/textes/commissions/" if com_seance == "Commission" else "https://www.senat.fr/amendements/textes/"
+        url_articles = url_base + session + "/" + id_disc + ".html"
+        return(url_articles)
+    except Exception as e :
+        print(f"Erreur URL des articles : {e}")
 
-def get_url_articles(url_disc):
-    session = get_session(url_disc)
-    id_disc = get_id_disc(url_disc)
-    com_seance = commission_ou_sceance(url_disc)
-    url_base = "https://www.senat.fr/amendements/textes/commissions/" if com_seance == "Commission" else "https://www.senat.fr/amendements/textes/"
-    url_articles = url_base + session + "/" + id_disc + ".html"
+
+
+
+def abrev_groupe(input : str):
+    groupe_liste = {"Groupe Les Républicains": "LR", "Groupe Union Centriste et Indépendants": "UCI", "Groupe Socialiste, Écologiste et Républicain": "SER", "Groupe Communiste Républicain Citoyen et Écologiste - Kanaky": "CRCE-K", "Groupe du Rassemblement Démocratique et Social Européen": "RDSE", "Groupe Rassemblement des démocrates, progressistes et indépendants": "RDPI", "Groupe Écologiste - Solidarité et Territoires": "GEST", "Groupe Les Indépendants - République et Territoires": "LIRT", "Groupe Union Nationale pour les Territoires": "RN", "Réunion administrative des Sénateurs ne figurant sur la liste d'aucun groupe": "NI"}
+    abrev_input = "?"
+    for groupe, abrev in groupe_liste.items() :
+        if input == groupe :
+            abrev_input = abrev           
+    return(abrev_input)
+
+TypeInfo = Literal["url_disc", "url_articles", "nb_parties"]
+def get_info_from_id(id_disc: str, type_info: TypeInfo) -> Optional[str]:
+    conn = get_conn()
+    requete = f"SELECT {type_info} FROM discussion WHERE id_disc = '{id_disc}'"
+    df = pd.read_sql(requete, conn,)
+    conn.close()
+    info = df.iloc[0, 0]
+    return(info)
+
+def turn_into_content(df : pd.DataFrame, id_disc, ordre) :
+    df["id_partie"] = id_disc + "-p" + str(ordre)
+    df["id_article"] = id_disc + "-" + df["article"].apply(lambda x : get_id_article(x))                                     
+    df["id_amdt"] = df["id_article"] + "-" + df["amdt"].apply(lambda x : get_id_amdt(x))           
+    df["is_ss_amdt"] = is_ss_amdt(df["amdt"])
+    df["lien_amdt"] = get_info_from_id(id_disc,"url_disc").replace("liste_discussion.html","") + df["lien_amdt"]
+    df = df[["id_amdt","id_article","id_partie","article","amdt","is_ss_amdt","lien_amdt","lien_article","auteur","url_senateur","sort"]]
+    return(df)
+
+def turn_into_ordre(df : pd.DataFrame, id_disc, ordre) :
+    df["id_article"] = id_disc + "-" + df["article"].apply(lambda x : get_id_article(x))
+    df["id_amdt"] = df["id_article"] + "-" + df["amdt"].apply(lambda x : get_id_amdt(x))
+    df["id_partie"] = id_disc + "-p" + str(ordre)
+    df["ordre_examen_in_partie"] = df.index
+    df = df[["id_amdt", "id_partie","ordre_examen_in_partie"]]
+    return(df)
+
+def get_url_article(article : str, id_disc : str):
+    url_articles = get_info_from_id(id_disc, "url_txt")
+    url_articles = url_articles + "#AMELI_SUB_4__Article_" + get_id_bloc_article(article)
     return(url_articles)
 
-def abrev_groupe(groupe):
-    match groupe:
-        case "Groupe Les Républicains":
-            return "LR"
-        case "Groupe Union Centriste et Indépendants":
-            return "UCI"
-        case "Groupe Socialiste, Écologiste et Républicain":
-            return "SER"
-        case "Groupe Communiste Républicain Citoyen et Écologiste - Kanaky":
-            return "CRCE-K"
-        case "Groupe du Rassemblement Démocratique et Social Européen":
-            return "RDSE"
-        case "Groupe Rassemblement des démocrates, progressistes et indépendants":
-            return "RDPI"
-        case "Groupe Écologiste - Solidarité et Territoires":
-            return "GEST"
-        case "Groupe Les Indépendants - République et Territoires":
-            return "LIRT"
-        case "Groupe Union Nationale pour les Territoires":
-            return "RN"
-        case "Réunion administrative des Sénateurs ne figurant sur la liste d'aucun groupe":
-            return "NI"
-        case _:
-            return "?"
+#print(get_url_article("Article(s) additionnel(s) après Article 11 (appelé en priorité)","2024-2025-SCE-62"))
+#print(get_info_from_id("2025-2026-SCE-138","url_disc"))
+
+def get_bloc_article(article : str) :
+    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
+    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
+    return(f"Article {digits}")
+
+def ffill_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for idx, row in df.iterrows():
+        if pd.isna(row["ordre_examen_in_partie"]):
+            # lignes des blocs précédents qui ont un ordre
+            precedents = df[(df["bloc"] < row["bloc"]) & df["ordre_examen_in_partie"].notna()]
+            if precedents.empty:
+                df.at[idx, "ordre_examen_in_partie"] = -1   # tout en haut
+            else:
+                bloc_prec = precedents["bloc"].max()
+                max_value = precedents.loc[precedents["bloc"] == bloc_prec, "ordre_examen_in_partie"].max()
+                df.at[idx, "ordre_examen_in_partie"] = max_value   # juste après le bloc précédent
+    return df    
