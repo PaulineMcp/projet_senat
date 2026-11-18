@@ -6,11 +6,10 @@
 from utils import *
 
 # Fonctions
-from fonctions.fonctions_checking import url_valide, disc_already_exist, is_not_google_doc
-from fonctions.fonctions_cleaning import commission_ou_sceance, get_session, get_id_disc, get_url_articles
-from fonctions.fonctions_scrapping import check_url
-from fonctions.init_discussion import fetch_disc, fetch_content, fetch_all_articles, init_remplissage_amdts, init_remplissage_articles
-#from fonctions.init_discussion import fetch_ordre_amdts
+from fonctions.fonctions_scrapping_cleaning.fonctions_checking import url_valide, disc_already_exist, is_not_google_doc
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import commission_ou_sceance, get_session, get_id_disc, get_url_articles
+from fonctions.fonctions_scrapping_cleaning.fonctions_scrapping import check_url
+from fonctions.init_discussion import init_remplissage_amdts, init_remplissage_articles, init_disc, init_content, init_articles, init_avis
 #from fonctions.init_discussion import fetch_content_amdts
 #from fonctions.init_discussion import fetch_avis
 #from fonctions.init_discussion import init_remplissage_amdts
@@ -84,7 +83,21 @@ with col_centre :
 
                     print(inputs)
 
-                    fetch_disc(url_disc, inputs)
+                    try:
+                        init_disc(url_disc, inputs)
+                        init_content(id_disc)
+                        init_articles(id_disc)
+                        init_avis(id_disc)
+                        init_remplissage_amdts(id_disc)
+                        init_remplissage_articles(id_disc)
+                        st.success("Enregistré")
+                    except Exception as e:
+                        print(f"Erreur : {e}")
+                        with get_db() as conn:
+                            conn.execute("DELETE FROM discussion WHERE id_disc = ?", (id_disc,))
+                        raise 
+
+
                     #fetch_content(id_disc)
                     
                     #fetch_all_articles(id_disc)
@@ -98,7 +111,7 @@ with col_centre :
                     #print("OBJET ET COM INITIALISES")
                     #init_remplissage_articles(id_disc)
                     #print("VOTES INITIALISES")
-                    st.success("Enregistré")
+                    
 
     st.space("large")
 

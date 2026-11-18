@@ -8,20 +8,32 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
 
 # Constantes
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-DB_PATH = Path(__file__).parent / "bdd.db" # remonte de pages à app_senat
-print(DB_PATH)
+DB_PATH = Path(__file__).parent / "bdd.db"
+#DB_PATH = Path(__file__).resolve().parent / "bdd.db"
 
-###############     CONNEXION BD     ###############
-def get_conn():
-    try :
-        return sqlite3.connect(DB_PATH, timeout=30)
-    except Exception as e :
-        print(f"Erreur de connexion à la base de données : {e}")
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 ###############     STYLE     ###############

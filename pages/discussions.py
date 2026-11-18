@@ -9,7 +9,7 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from utils import get_conn
+from utils import *
 
 ###############     PAGE        ###############
 
@@ -24,9 +24,8 @@ col_gauche, col_centre, col_droite = st.columns([1,3,1])
 with col_centre :
     st.write("Liste de tous les tableaux déjà créés")
         
-    conn = get_conn()
-    df = pd.read_sql("SELECT * FROM discussion", conn)
-    conn.close()
+    with get_db as conn:
+        df = pd.read_sql("SELECT * FROM discussion", conn)
 
     for _, ligne in df.iterrows():
         if st.button(ligne["titre_disc_long"], key=f"{ligne["id_disc"]}"):
