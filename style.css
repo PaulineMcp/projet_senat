@@ -1,0 +1,6 @@
+/* Boutons de navigation de l'accueil */
+.st-key-boutons_navigation div.stButton > button {
+        height: 80px;
+        width: 100%;
+        white-space: normal;
+        }
