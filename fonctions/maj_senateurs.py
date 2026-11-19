@@ -34,9 +34,9 @@ def maj_senateurs():
         # Envoyer les données dans la base
         with get_db() as conn :
             df.to_sql("senateurs", conn, if_exists="replace", index = False)
+            print("Données sénateurs maj !")
     except Exception as e :
             print(f"Error : {e}")
 
 ###############     APPEL     ############### 
 maj_senateurs()
-print("Données sénateurs maj !")

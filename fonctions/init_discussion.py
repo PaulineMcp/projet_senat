@@ -312,61 +312,76 @@ def init_avis(id_disc : str) -> None:
 
 ###############     REMPLISSAGE AP DES AMDTS        ###############
 
-def init_remplissage_amdts(id_disc : str) -> None :
-    """Initialise un objet vide, un com vide et une proposition de vote vide pour chaque amdt""" 
+
+def init_remplissage_amdts(id_disc: str) -> None:
+    """Initialise les objets, commentaires et propositions de vote
+    uniquement pour les amendements qui ne sont pas encore initialisés.
+    """
     with get_db() as conn:
 
-    # On récupère la liste de tous les amdts pour une disc
         df = pd.read_sql("""
             SELECT DISTINCT amdts.id_amdt
             FROM amdts
             LEFT JOIN parties
                 ON parties.id_partie = amdts.id_partie
-            LEFT JOIN discussion
-                ON discussion.id_disc = parties.id_disc
-            WHERE discussion.id_disc = ?
+            WHERE parties.id_disc = ?
             AND NOT EXISTS (
                 SELECT 1
                 FROM remplissage_ap_amdt r
                 WHERE r.id_amdt = amdts.id_amdt
             )
-                        """,
-                        conn,
-                        params=(id_disc,))
-        # Rajouter les objets et commentaires actuellement vide
-        df["objet"] = "À compléter"
-        df["com"] = ""
-        df["proposition_vote_amdt"] = "À définir"            
-        df.to_sql("remplissage_ap_amdt", conn, if_exists="append", index = False)
-    print("Initialisation des objets, commentaires et prop.vote amdt") 
+        """, conn, params=(id_disc,))
 
-#init_remplissage_amdts("2024-2025-SCE-62")
-#init_remplissage_amdts("2025-2026-SCE-138")
-#init_remplissage_amdts("2025-2026-COM-689")
-#init_remplissage_amdts("2026-2027-SCE-138")
+        if not df.empty:
+            df["objet"] = "À compléter"
+            df["com"] = ""
+            df["proposition_vote_amdt"] = "À définir"
 
-###############     REMPLISSAGE AP DES ARTICLES     ###############
+            df.to_sql(
+                "remplissage_ap_amdt",
+                conn,
+                if_exists="append",
+                index=False
+            )
 
-def init_remplissage_articles(id_disc : str) -> None : 
-    """Initialise un résumé et une proposition de vote vide pour chaque article"""
+            print(f"{len(df)} amendements initialisés.")
+        else:
+            print("Aucun nouvel amendement à initialiser.")
+
+
+def init_remplissage_articles(id_disc: str) -> None:
+    """Initialise les résumés et propositions de vote
+    uniquement pour les articles qui ne sont pas encore initialisés.
+    """
     with get_db() as conn:
-        # On récupère la liste de tous les articles pour une disc
+
         df = pd.read_sql("""
-           SELECT DISTINCT articles.id_article
-            FROM articles
-            WHERE articles.id_disc = ?
+            SELECT DISTINCT a.id_article
+            FROM articles a
+            WHERE a.id_disc = ?
             AND NOT EXISTS (
                 SELECT 1
                 FROM remplissage_ap_article r
-                WHERE r.id_article = articles.id_article
-                        """,
-                        conn,
-                        params=(id_disc,))
-        # Rajouter les propositions de vote
-        df["resume_article"] = None
-        df["proposition_vote_article"] = None
-        df.to_sql("remplissage_ap_article", conn, if_exists="append", index = False)
-    print("Initialisation des résumés et prop.vote articles")
+                WHERE r.id_article = a.id_article
+            )
+        """, conn, params=(id_disc,))
+
+        if not df.empty:
+            df["resume_article"] = None
+            df["proposition_vote_article"] = None
+
+            df.to_sql(
+                "remplissage_ap_article",
+                conn,
+                if_exists="append",
+                index=False
+            )
+
+            print(f"{len(df)} articles initialisés.")
+        else:
+            print("Aucun nouvel article à initialiser.")
+
+
 
 
 #init_remplissage_articles("2024-2025-SCE-62")
