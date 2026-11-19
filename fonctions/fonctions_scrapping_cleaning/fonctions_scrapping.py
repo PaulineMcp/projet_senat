@@ -23,7 +23,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fonctions.fonctions_cleaning import commission_ou_sceance, get_id_disc, get_session, get_id_article, get_id_bloc_article, get_id_amdt, is_ss_amdt
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import commission_ou_sceance, get_id_disc, get_session, get_id_article, get_id_bloc_article, get_id_amdt, is_ss_amdt
 #get_avis_com, get_avis_gouv, get_tab_content
 from utils import *
 
@@ -81,7 +81,7 @@ def parsing_line(line):
         lien_amdt = cells[1].find('a').get("href")
 
         # 3ème cellule
-        auteur =   cells[2].text.strip().replace("\t","").replace("\n","")
+        auteur =   cells[2].text.strip().replace("\t","").replace("\n","").title()
         try :
                 lien_auteur = "https:" + (cells[2].find('a').get("href").replace("senfic/","senateur/"))
         except:

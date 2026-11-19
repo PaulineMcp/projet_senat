@@ -13,17 +13,17 @@ sys.path.insert(0, str(ROOT))
 from utils import *
 from fonctions.fonctions_scrapping_cleaning.fonctions_scrapping import get_hash
 from fonctions.upsert_bdd import upsert_df
-from init_discussion import fetch_content, fetch_articles_from_texte, fetch_articles_from_amdts, fetch_avis
+from init_discussion import fetch_content, fetch_articles_from_texte, fetch_articles_from_amdts, fetch_avis, fetch_disc
 
 # Récupérer la liste des discussion non-archivées
-with get_db as conn :
+with get_db() as conn :
     df_active_disc = pd.read_sql("""SELECT *
                         FROM discussion
                         WHERE discussion.is_archived = 0
                     """,
                     conn,)
 
-for id_disc, last_hash, url_disc in df_active_disc[["id_disc","last_hash","url_disc"]].itertuples(index=False, name=None):
+for id_disc, last_hash, url_disc, titre, lien_note, lien_dossier, url_txt in df_active_disc[["id_disc","last_hash","url_disc","titre_disc","lien_note","lien_dossier","url_txt"]].itertuples(index=False, name=None):
     print(id_disc)
     # Check le hash actuel
     actual_hash = get_hash(url_disc)
@@ -32,9 +32,24 @@ for id_disc, last_hash, url_disc in df_active_disc[["id_disc","last_hash","url_d
     else :
         print("Actualisation de la discussion")
 
+        inputs = {
+                    "titre" : titre,
+                    "url" : url_disc,
+                    "lien_note" : lien_note,
+                    "lien_dossier" : lien_dossier,
+                    "url_txt" : url_txt
+                    }
+        
+        updated_disc = fetch_disc(url_disc, inputs) # permet de re calculer un nouveau hash et nouveau nb de parties
+        upsert_df("discussion", updated_disc, "id_disc")
+        
         updated_parties, updated_ordre, updated_content = fetch_content(id_disc)
         upsert_df("parties", updated_parties, "id_partie")
         upsert_df("ordre_examen", updated_ordre, "id_amdt")
+
+        with get_db() as conn :
+            # Changer tous les amdts pour inactif
+            conn.execute("UPDATE amdts SET is_active = 0 WHERE id_disc = ?",(id_disc,))
         upsert_df("amdts", updated_content, "id_amdt")
 
         updated_art_from_amdts = fetch_articles_from_amdts(id_disc)

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from utils import get_conn
-from fonctions_cleaning import abrev_groupe
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_groupe
 
 ###############     FONCTION     ###############       
 def maj_senateurs():
@@ -29,7 +29,6 @@ def maj_senateurs():
             "Groupe politique" : "groupe"
         })
         df["groupe"] = df["groupe"].apply(lambda x : abrev_groupe(x))
-        print(df.columns)
         df["nom_groupe"] = df["civilite"] + " " + df["nom"] + " (" + df["groupe"] + ")"
 
         # Envoyer les données dans la base

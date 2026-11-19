@@ -1,12 +1,12 @@
 import pandas as pd
 import streamlit as st
-from fonctions.fonctions_affichage import couleur_sort
-from fonctions.fonctions_affichage import couleur_parti
-from fonctions.fonctions_affichage import get_row_height
+from fonctions.fonctions_tableau.fonctions_affichage import couleur_sort
+from fonctions.fonctions_tableau.fonctions_affichage import couleur_parti
+from fonctions.fonctions_tableau.fonctions_affichage import get_row_height
 
 OPTIONS = ["🟢 Pour", "🟡 Plutôt pour", "🟠 Plutôt contre", "🔴 Contre", "⚪️ Abstention", "🔵 Selon débat"]
 
-def display_tab(df_by_article : pd.DataFrame, article : str, id_partie : str):
+def display_tab(df_by_article : pd.DataFrame, article : str, id_partie : str) -> pd.DataFrame :
     row_height = get_row_height(df_by_article, {"objet": 200, "com": 200})
     hauteur_tab = 35 + len(df_by_article) * row_height + 3
 
@@ -38,7 +38,7 @@ def display_tab(df_by_article : pd.DataFrame, article : str, id_partie : str):
     )
     return(df_edite)
 
-def display_vote(est_additionnel : bool, dict_votes_articles : dict, article : str, votes : dict):
+def display_vote(est_additionnel : bool, dict_votes_articles : dict, id_article : str, article : str, votes : dict):
     if not est_additionnel:
         col_vote, col_droite = st.columns(2)
         with col_vote:
@@ -46,30 +46,30 @@ def display_vote(est_additionnel : bool, dict_votes_articles : dict, article : s
                 st.write(f"Vote sur {article}")
                 col, _ = st.columns([1, 1])
                 with col:
-                    vote_actuel = dict_votes_articles.get(str(article))
-                    votes[article] = st.selectbox(
-                        f"vote-{article}",
+                    vote_actuel = dict_votes_articles.get(str(id_article))
+                    votes[id_article] = st.selectbox(
+                        f"vote-{id_article}",
                         OPTIONS,
                         index=OPTIONS.index(vote_actuel) if vote_actuel in OPTIONS else None,
                         placeholder="Sélectionner un vote",
-                        key=f"vote_{article}",
+                        key=f"vote_{id_article}",
                         label_visibility="collapsed",
                         )
 
-def display_titre_resume_article(article : str, dict_resumes : dict, resumes : dict):
+def display_titre_resume_article(id_article : str, article : str, dict_resumes : dict, resumes : dict):
     col_gauche, col_centre, col_droite = st.columns([1, 2, 1])
     with col_centre:
         with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="center"):
             st.markdown(f"<div style='font-size:24px; font-weight:600; margin:0; padding:0;'>{article}</div>", unsafe_allow_html=True,)
 
-                # Récupère le résumé pour cette clé "article"
-            resume_actuel = dict_resumes.get(str(article))
+                # Récupère le résumé pour cette clé "id_article"
+            resume_actuel = dict_resumes.get(str(id_article))
             if resume_actuel is None or pd.isna(resume_actuel):
                 resume_actuel = ""
-            resumes[article] = st.text_input(
-                        key=f"resum_{article}",
+            resumes[id_article] = st.text_input(
+                        key=f"resum_{id_article}",
                         label="Résumé",
                         label_visibility="collapsed",
                         value=resume_actuel,
                         placeholder="Tapez ici le résumé de l'article",
-                    )  
+                    ) 

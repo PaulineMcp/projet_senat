@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import get_id_disc, get_session, get_id_article, get_id_bloc_article, get_id_amdt, is_ss_amdt, get_info_from_id, turn_into_content, turn_into_ordre, get_url_article, get_bloc_article
-from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import get_content_page, get_hash, get_tab_list, get_disc_info, parsing_line, get_avis_gouv, get_avis_com
+from fonctions.fonctions_scrapping_cleaning.fonctions_scrapping import get_content_page, get_hash, get_tab_list, get_disc_info, parsing_line, get_avis_gouv, get_avis_com
 from fonctions.upsert_bdd import upsert_df
 from utils import get_db
 
@@ -38,7 +38,7 @@ from utils import get_db
 # Récupérer les infos principales de la discussion
 
 # Initialiser la discussion
-def init_disc(url : str, inputs : dict) -> None:
+def fetch_disc(url : str, inputs : dict) -> pd.DataFrame :
         """Récupère les infos d'une discussion et l'ajoute à la BDD"""
 
         # Récupère les infos principales du ppl/pjl
@@ -47,30 +47,28 @@ def init_disc(url : str, inputs : dict) -> None:
         nb_parties = len(get_tab_list(url))
         last_hash = get_hash(url)
         is_archived = 0
-    
-        # Rajoute la discussion aux discussions existantes
-        with get_db() as conn:
-            conn.execute(
-                    """
-                    INSERT INTO discussion
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                    infos["id_disc"],
-                    inputs["url"],
-                    inputs["titre"],
-                    titre_disc_long,
-                    nb_parties,
-                    infos["com_seance"],
-                    infos["lecture"],
-                    last_hash,
-                    inputs["lien_note"].strip(),
-                    inputs["lien_dossier"].strip(),
-                    inputs["url_txt"],
-                    is_archived
-                    ),
-            )
-            print("Discussion ajoutée à la BDD")
+        disc = [{"id_disc" : infos["id_disc"],
+         "url_disc" : inputs["url"],
+         "titre_disc" : inputs["titre"],
+         "titre_disc_long" : titre_disc_long,
+         "nb_parties" : nb_parties,
+         "com_seance" : infos["com_seance"],
+         "lecture" : infos["lecture"],
+         "last_hash" : last_hash,
+         "lien_note" : inputs["lien_note"].strip(),
+         "lien_dossier" : inputs["lien_dossier"].strip(),
+         "url_txt" : inputs["url_txt"],
+         "is_archived" : is_archived
+         }]
+        df = pd.DataFrame(disc)
+        print("Infos de la discussion récupérés")
+        return(df)
+
+def init_disc(url : str, inputs : str) -> None :
+    """Récupère les infos d'une discussion et l'ajoute à la BDD"""
+    df = fetch_disc(url, inputs)
+    upsert_df("discussion", df, "id_disc")
+    print("Infos de la discussion ajoutées à la BDD")
 
 ###################
 
@@ -162,14 +160,14 @@ def init_content(id_disc : str ) -> None :
 
     # Ordre imposé par les clés étrangères : parties → amdts → ordre_examen
     a_inserer = [
-        ("parties", df_parties),
-        ("amdts", df_content),
-        ("ordre_examen", df_ordre),
+        ("parties", df_parties, "id_partie"),
+        ("amdts", df_content, "id_amdt"),
+        ("ordre_examen", df_ordre, "id_amdt"),
     ]
 
-    with get_db() as conn:
-        for table, df in a_inserer:
-            upsert_df(table, df)
+    #with get_db() as conn:
+    for table, df, cle in a_inserer:
+        upsert_df(table, df, cle)
     #send_content_to_bdd(df_list)
     print("Contenu, ordre et parties ajoutés")
 
@@ -256,7 +254,8 @@ def init_articles(id_disc : str) -> None:
     df["article"] = df["article"].map(lambda s: " ".join(unicodedata.normalize("NFKC", s).split()))
     df = df.drop_duplicates(subset=["id_bloc_article","bloc_article","bloc","id_article","id_disc"], keep="first")
     #send_article_to_bdd(df)
-    upsert_df("articles", df)
+    upsert_df("articles", df, "id_article")
+    print("Articles ajoutés")
 
 #fetch_all_articles("2024-2025-SCE-62")
 #fetch_all_articles("2025-2026-SCE-138")
@@ -301,7 +300,7 @@ def init_avis(id_disc : str) -> None:
     """Récupère les avis et les initialise en BDD"""
     df = fetch_avis(id_disc)
     #send_avis_to_bdd(df)
-    upsert_df("avis", df)
+    upsert_df("avis", df, "id_amdt")
 
 #fetch_avis("2024-2025-SCE-62")
 #fetch_avis("2025-2026-SCE-138")
@@ -362,3 +361,6 @@ def init_remplissage_articles(id_disc : str) -> None :
 #init_remplissage_articles("2025-2026-SCE-138")
 #init_remplissage_articles("2025-2026-COM-689")
 #init_remplissage_articles("2026-2027-SCE-138")
+
+def vide(x):
+    return None if pd.isna(x) else x

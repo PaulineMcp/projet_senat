@@ -31,12 +31,13 @@ CREATE TABLE amdts(
     lien_article TEXT,
     auteur TEXT,
     url_senateur TEXT,
-    sort TEXT DEFAULT 'NA'
+    sort TEXT DEFAULT 'NA',
+    is_active INT
 );
 
 CREATE TABLE ordre_examen(
-    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE, -- primary key ??? 
-    id_partie TEXT NOT NULL REFERENCES parties(id_partie) ON DELETE CASCADE,  -- FK ajoutée
+    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE, 
+    id_partie TEXT NOT NULL REFERENCES parties(id_partie) ON DELETE CASCADE,
     ordre_examen_in_partie INT NOT NULL,
     ordre_examen_abs INT NOT NULL 
 );
@@ -46,26 +47,26 @@ CREATE TABLE articles(
     bloc_article TEXT,
     bloc TEXT,
     id_article TEXT PRIMARY KEY,
-    id_disc TEXT REFERENCES discussion(id_disc) ON DELETE CASCADE,            -- FK ajoutée
+    id_disc TEXT REFERENCES discussion(id_disc) ON DELETE CASCADE,
     article TEXT,
     lien_article TEXT
 );
 
 CREATE TABLE avis(
-    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE,     -- FK ajoutée
+    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE,
     avis_gouv TEXT DEFAULT 'NA',
     avis_com TEXT DEFAULT 'NA'
 );
 
 CREATE TABLE remplissage_ap_amdt(
-    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE,     -- FK ajoutée
+    id_amdt TEXT PRIMARY KEY REFERENCES amdts(id_amdt) ON DELETE CASCADE,
     objet TEXT NULL,
     com TEXT NULL,
     proposition_vote_amdt TEXT
 );
 
 CREATE TABLE remplissage_ap_article(
-    id_article TEXT PRIMARY KEY REFERENCES articles(id_article) ON DELETE CASCADE,  -- FK ajoutée
+    id_article TEXT PRIMARY KEY REFERENCES articles(id_article) ON DELETE CASCADE,
     resume_article TEXT,
     proposition_vote_article TEXT
 );

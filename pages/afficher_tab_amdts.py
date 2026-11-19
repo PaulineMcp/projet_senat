@@ -17,10 +17,10 @@ COLS = ["objet", "com", "proposition_vote_amdt"]
 # Import des fonctions
 from fonctions.fonctions_tableau.get_tab_to_aff import retrieve_tab, retrieve_first_tab, retrieve_infos_disc, retrieve_info_articles
 from fonctions.fonctions_tableau.display_tab import display_titre_resume_article, display_tab, display_vote
-from fonctions.fonctions_cleaning import abrev_article, ffill_df
-from fonctions.fonctions_affichage import couleur_sort
-from fonctions.fonctions_affichage import couleur_parti
-from fonctions.fonctions_affichage import get_row_height
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article, ffill_df
+from fonctions.init_discussion import vide
+#from fonctions.fonctions_tableau.fonctions_affichage import couleur_parti
+#from fonctions.fonctions_tableau.fonctions_affichage import get_row_height
 from utils import *
 
 ###############     STYLE     ###############
@@ -116,22 +116,23 @@ for id_partie, titre_partie in (df_all_partie[["id_partie", "titre_partie"]].dro
 
             # DF PARTIE FILTRÉ PAR ARTICLE
             df_by_article = df_first_partie[df_first_partie["id_article"] == id_article].reset_index(drop=True)
+            df_by_article["nom_groupe"] = df_by_article["nom_groupe"].fillna(df_by_article["auteur"])
 
             # AFFICHAGE DU N° DE L'ARTICLE ET DU RESUME
-            display_titre_resume_article(article, dict_resumes, resumes)              
+            display_titre_resume_article(id_article, article, dict_resumes, resumes)              
 
             # AFFICHAGE DU TABLEAU
             if pd.isna(df_by_article["id_amdt"].iloc[0]):
-                st.write("Pas d'amendement sur cet article")
+                st.write("Pas d'amendement sur cet article dans cette partie")
             else :
                 df_edite = display_tab(df_by_article, article, id_partie)
 
             # AFFICHAGE DU VOTE
             est_additionnel = True if "add" in article else False
-            display_vote(est_additionnel, dict_votes_articles, article, votes)
+            # ici il faut quand même enregistrer les resumes des articles additionnels
+            display_vote(est_additionnel, dict_votes_articles, id_article, article, votes)
 
             st.space("xlarge")
-
 
             editeurs.append((df_by_article, df_edite))
 
@@ -151,7 +152,7 @@ for id_partie, titre_partie in (df_all_partie[["id_partie", "titre_partie"]].dro
 
         # AFFICHAGE DU TABLEAU
         if pd.isna(df_by_article["id_amdt"].iloc[0]):
-            st.write("Pas d'amendement sur cet article")
+            st.write("Pas d'amendement sur cet article dans cette partie")
         else :
             df_edite = display_tab(df_by_article, article, id_partie)
 
@@ -161,10 +162,9 @@ for id_partie, titre_partie in (df_all_partie[["id_partie", "titre_partie"]].dro
 ###############     SAUVEGARDE DES MODIFS     ###############
 
 if st.button("Sauvegarder les modifications"):
-    with get_db as conn:
-
-    # Tableaux des amendements
-        try:
+    try :
+        with get_db() as conn:
+            # Tableaux des amendements (objets et coms)
             for original, edite in editeurs:
                 for i in range(len(original)):
                     if not original.loc[i, COLS].equals(edite.loc[i, COLS]):
@@ -182,25 +182,31 @@ if st.button("Sauvegarder les modifications"):
                                 ligne["id_amdt"],
                             ),
                         )
-        except Exception as e:
-            st.error(f"Erreur d'enregistrement des informations sur l'objet, le commentaire ou le vote des amendements : {e}")
-
-        # Résumés et votes des articles
-        try:
-            for article, vote in votes.items():
-                # Si aucun vote n'est sélectionné, on garde le vote déjà en base
-                if vote is None:
-                    vote = dict_votes_articles.get(str(article))
+            # Votes
+            for id_article, vote in votes.items():
+                if vote is None:             
+                    continue
                 conn.execute(
                     """
-                    INSERT INTO remplissage_ap_article (id_article, resume_article, proposition_vote_article)
-                    VALUES (?, ?, ?)
+                    INSERT INTO remplissage_ap_article (id_article, proposition_vote_article)
+                    VALUES (?, ?)
                     ON CONFLICT(id_article) DO UPDATE SET
-                        resume_article = excluded.resume_article,
                         proposition_vote_article = excluded.proposition_vote_article
                     """,
-                    (article, resumes.get(article) or None, vote),
+                    (id_article, vide(vote)),
                 )
-        except Exception as e:
-            st.error(f"Erreur d'enregistrement des informations de résumé et de vote sur les articles : {e}")
+
+            # Résumés
+            for id_article, resume in resumes.items():
+                conn.execute(
+                    """
+                    INSERT INTO remplissage_ap_article (id_article, resume_article)
+                    VALUES (?, ?)
+                    ON CONFLICT(id_article) DO UPDATE SET
+                        resume_article = excluded.resume_article
+                    """,
+                    (id_article, vide(resume) or None),
+                )
+    except Exception as e:
+            st.error(f"Erreur d'enregistrement : {e}")
     st.success("Modifications enregistrées")

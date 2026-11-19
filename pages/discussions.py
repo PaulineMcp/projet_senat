@@ -24,7 +24,7 @@ col_gauche, col_centre, col_droite = st.columns([1,3,1])
 with col_centre :
     st.write("Liste de tous les tableaux déjà créés")
         
-    with get_db as conn:
+    with get_db() as conn:
         df = pd.read_sql("SELECT * FROM discussion", conn)
 
     for _, ligne in df.iterrows():

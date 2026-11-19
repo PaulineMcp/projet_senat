@@ -24,7 +24,7 @@ import pandas as pd
 from typing import Literal, Optional
 
 # Constantes
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from utils import *
@@ -39,8 +39,9 @@ def get_id_disc(url_disc : str):
 
 def get_id_amdt(amdt : str):
     amdt = amdt.replace("\n","")
-    amdt = amdt.replace("S/Amt ","s/a").replace("n°","").strip()
-    amdt = amdt.replace("Amt","").replace("n°","").strip()  
+    amdt = unicodedata.normalize("NFKC", amdt)
+    amdt = amdt.replace("S/Amt ","s/a-").replace("n°","").strip()
+    amdt = amdt.replace("Amt","").replace("n°","").strip() 
     id_amdt = amdt.replace("Motion","").strip()
     multiplicatifs = {"rect. decies": "rdc", "rect. nonies": "rnn", "rect. octies": "roc", "rect. septies": "rsp", "rect. sexies": "rsx", "rect. quinquies": "rqq", "rect. quater": "rqt", "rect. ter": "rt", "rect. bis": "rb", "rect.": "r"}
     for cle, code in multiplicatifs.items():
@@ -48,9 +49,6 @@ def get_id_amdt(amdt : str):
             id_amdt = amdt.replace(cle,"").replace(" ","")
             break
     return(id_amdt)
-
-#TEST
-#print(get_id_amdt("Amt n° I-42 rect. bis"))
 
 def commission_ou_sceance(url_pjl : str) :
     if "commission" in url_pjl:
@@ -143,10 +141,14 @@ def get_id_article(article : str) :
     return(id_article)
 
 
-def get_id_bloc_article(article : str):   
-    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
-    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
-    return(digits)
+def get_id_bloc_article(article : str) -> str :   
+    article = unicodedata.normalize("NFKC", article).lower()
+    if "Liminaire" in article :
+        id_bloc = "lim"
+    if "Motion" in article :
+        id_bloc = "mot"
+    id_bloc = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article)) # extrait les nombres
+    return(id_bloc)
 
 def get_url_articles(url_disc : str):
     try :
@@ -184,7 +186,8 @@ def turn_into_content(df : pd.DataFrame, id_disc, ordre) :
     df["id_amdt"] = df["id_article"] + "-" + df["amdt"].apply(lambda x : get_id_amdt(x))           
     df["is_ss_amdt"] = is_ss_amdt(df["amdt"])
     df["lien_amdt"] = get_info_from_id(id_disc,"url_disc").replace("liste_discussion.html","") + df["lien_amdt"]
-    df = df[["id_amdt","id_article","id_partie","article","amdt","is_ss_amdt","lien_amdt","lien_article","auteur","url_senateur","sort"]]
+    df["is_active"] = 1
+    df = df[["id_amdt","id_article","id_partie","article","amdt","is_ss_amdt","lien_amdt","lien_article","auteur","url_senateur","sort", "is_active"]]
     return(df)
 
 def turn_into_ordre(df : pd.DataFrame, id_disc, ordre) :
@@ -199,9 +202,6 @@ def get_url_article(article : str, id_disc : str):
     url_articles = get_info_from_id(id_disc, "url_txt")
     url_articles = url_articles + "#AMELI_SUB_4__Article_" + get_id_bloc_article(article)
     return(url_articles)
-
-#print(get_url_article("Article(s) additionnel(s) après Article 11 (appelé en priorité)","2024-2025-SCE-62"))
-#print(get_info_from_id("2025-2026-SCE-138","url_disc"))
 
 def get_bloc_article(article : str) :
     article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal

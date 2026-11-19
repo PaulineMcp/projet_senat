@@ -81,7 +81,6 @@ with col_centre :
                     id_disc = session + "-" + raw_com_seance + "-" + get_id_disc(url_disc)
                     print(f"id discussion : {id_disc}")
 
-                    print(inputs)
 
                     try:
                         init_disc(url_disc, inputs)
