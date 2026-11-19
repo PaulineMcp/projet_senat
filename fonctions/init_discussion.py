@@ -318,13 +318,18 @@ def init_remplissage_amdts(id_disc : str) -> None :
 
     # On récupère la liste de tous les amdts pour une disc
         df = pd.read_sql("""
-                        SELECT amdts.id_amdt         
-                        FROM amdts 
-                        LEFT JOIN parties
-                        ON parties.id_partie = amdts.id_partie
-                        LEFT JOIN discussion
-                        ON discussion.id_disc = parties.id_disc
-                        WHERE discussion.id_disc = ?
+            SELECT DISTINCT amdts.id_amdt
+            FROM amdts
+            LEFT JOIN parties
+                ON parties.id_partie = amdts.id_partie
+            LEFT JOIN discussion
+                ON discussion.id_disc = parties.id_disc
+            WHERE discussion.id_disc = ?
+            AND NOT EXISTS (
+                SELECT 1
+                FROM remplissage_ap_amdt r
+                WHERE r.id_amdt = amdts.id_amdt
+            )
                         """,
                         conn,
                         params=(id_disc,))
@@ -347,9 +352,13 @@ def init_remplissage_articles(id_disc : str) -> None :
     with get_db() as conn:
         # On récupère la liste de tous les articles pour une disc
         df = pd.read_sql("""
-                        SELECT id_article
-                        FROM articles
-                        WHERE id_disc = ?
+           SELECT DISTINCT articles.id_article
+            FROM articles
+            WHERE articles.id_disc = ?
+            AND NOT EXISTS (
+                SELECT 1
+                FROM remplissage_ap_article r
+                WHERE r.id_article = articles.id_article
                         """,
                         conn,
                         params=(id_disc,))

@@ -181,14 +181,14 @@ def get_id_bloc_article(article : str) -> str :
     return(id_bloc)
 
 # TEST
-print(get_id_bloc_article("Article unique"))
-print(get_id_bloc_article("Intitulé de la proposition de loi"))
-print(get_id_bloc_article("Motions"))
-print(get_id_bloc_article("Article 1er"))
-print(get_id_bloc_article("Article 49 (crédits de la mission) État B"))
-print(get_id_bloc_article("Article(s) additionnel(s) après Article 23 bis"))
-print(get_id_bloc_article("Article(s) additionnel(s) après Article 5 (Supprimé)"))
-print(get_id_bloc_article("Article(s) additionnel(s) après Article 24 (réservé jusqu'après les amendements portant article additionnel après l'article 30)"))
+#print(get_id_bloc_article("Article unique"))
+#print(get_id_bloc_article("Intitulé de la proposition de loi"))
+#print(get_id_bloc_article("Motions"))
+#print(get_id_bloc_article("Article 1er"))
+#print(get_id_bloc_article("Article 49 (crédits de la mission) État B"))
+#print(get_id_bloc_article("Article(s) additionnel(s) après Article 23 bis"))
+#print(get_id_bloc_article("Article(s) additionnel(s) après Article 5 (Supprimé)"))
+#print(get_id_bloc_article("Article(s) additionnel(s) après Article 24 (réservé jusqu'après les amendements portant article additionnel après l'article 30)"))
 
 def get_url_articles(url_disc : str):
     try :

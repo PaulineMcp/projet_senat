@@ -12,7 +12,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from utils import get_conn
+from utils import *
 from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_groupe
 
 ###############     FONCTION     ###############       
@@ -32,10 +32,8 @@ def maj_senateurs():
         df["nom_groupe"] = df["civilite"] + " " + df["nom"] + " (" + df["groupe"] + ")"
 
         # Envoyer les données dans la base
-        conn = get_conn()
-        df.to_sql("senateurs", conn, if_exists="replace", index = False)
-        conn.commit()
-        conn.close()
+        with get_db() as conn :
+            df.to_sql("senateurs", conn, if_exists="replace", index = False)
     except Exception as e :
             print(f"Error : {e}")
 

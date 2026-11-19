@@ -45,7 +45,9 @@ for id_disc, last_hash, url_disc, titre, lien_note, lien_dossier, url_txt in df_
                             WHERE id_partie IN (SELECT id_partie FROM parties WHERE id_disc = ?)
                         """,
                         (id_disc,))
+            
         upsert_df("amdts", updated_content, "id_amdt")
+        print(updated_content)
 
         print("# Actualisation de l'ordre")
         upsert_df("ordre_examen", updated_ordre, "id_amdt")
