@@ -99,7 +99,6 @@ with col_buttons:
 st.space("medium")
 
 ###############     TABLEAU     ###############
-st.dataframe(df_all_partie)
 
 for id_partie, titre_partie in (df_all_partie[["id_partie", "titre_partie"]].dropna().drop_duplicates().itertuples(index=False, name=None)):
 
