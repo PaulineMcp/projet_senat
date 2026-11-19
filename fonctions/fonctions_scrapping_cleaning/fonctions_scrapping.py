@@ -126,22 +126,28 @@ def parsing_line(line):
 #    df = pd.DataFrame(df)
  #   return(df)
 
-def get_avis_gouv(url_amdt):
-        try :
-              soup = get_content_page(url_amdt)
-              avis = soup.find_all(attrs={"align" : "left", "valign" : "top", "width" : "70%"})
-              avis_gouv = avis[1].text.replace("\t","").replace("\n","")  
-        except Exception as e :
-                avis_gouv = "Avis non-trouvé"
-        return(avis_gouv)
+def get_avis_gouv(url):
+    if not url:
+        return "Pas d'avis"
+    try:
+        soup = get_content_page(url)
+    except Exception as e:
+        print(f"Avis gouv non récupéré ({url}) : {e}")
+        return None                       # inconnu : on ne touche pas à la base
+    avis = soup.find_all(...)             # ta sélection actuelle, inchangée
+    return " ".join(avis[0].text.split()) if avis else "Pas d'avis"
                
 
-def get_avis_com(url_amdt):
-
-    soup = get_content_page(url_amdt)
-    avis = soup.find_all(attrs={"align" : "left", "valign" : "top", "width" : "70%"})
-    avis_com = avis[0].text.replace("\t","").replace("\n","")  
-    return(avis_com)
+def get_avis_com(url):
+    if not url:
+        return "Pas d'avis"
+    try:
+        soup = get_content_page(url)
+    except Exception as e:
+        print(f"Avis non récupéré ({url}) : {e}")
+        return None                      # inconnu : on ne touche pas à la base
+    avis = soup.find_all(...)
+    return " ".join(avis[0].text.split()) if avis else "Pas d'avis"
 
 # Récupérer le numéro de lecture
 def get_lecture(soup):
