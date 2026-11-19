@@ -112,7 +112,11 @@ def fetch_content(id_disc : str) -> list :
             df_tmp = []
             # Récupérer le titre de la partie
             titre = table.find_previous("h5")
-            titre = titre.text.strip()
+            if titre is None :
+                titre = "Première partie"
+            else :
+                titre = titre.text.strip()
+            
             df_parties.append({
                 "id_partie" : id_disc + "-p" + str(ordre),
                 "id_disc" : id_disc,

@@ -75,36 +75,43 @@ def abrev_article(article : str):
     suffixe = {"état" : "Ét.", "annexe" : "Anx."}
     
     article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
-    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
+    if article == "intitulé de la proposition de loi" :
+        abrev = "Int.PPL"
+    else : 
+        if "unique" in article :
+            digits = "Unq"
+        else :
+            digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
 
-    pref = "Art."
-    for cle,code in prefixe.items():
-        if cle in article :
-            pref = code
-            break
-            
-    mult = ""
-    for item in multiplicatif :
-        if item in re.findall(r"[a-zà-ÿ]+", article) :
-            mult = item
-            break
-
-    suf = ""
-    for cle,code in suffixe.items():
-        if cle in article :
-            if cle == "état" :
-                suf = code + article[-1].upper()
+        pref = "Art."
+        for cle,code in prefixe.items():
+            if cle in article :
+                pref = code
                 break
-            else : 
-                suf = code
+                
+        mult = ""
+        for item in multiplicatif :
+            if item in re.findall(r"[a-zà-ÿ]+", article) :
+                mult = item
+                break
 
-    abrev = pref + digits + mult + suf            
+        suf = ""
+        for cle,code in suffixe.items():
+            if cle in article :
+                if cle == "état" :
+                    suf = code + article[-1].upper()
+                    break
+                else : 
+                    suf = code
+
+        abrev = pref + digits + mult + suf            
     return(abrev)
+
 
 def get_id_article(article : str) :
 
     multiplicatif = {"bis": "b", "ter": "t", "quater": "qt", "quinquies": "qq", "sexies": "sx", "septies": "sp", "octies": "oc", "nonies": "nn", "decies": "dc", "undecies": "udc", "duodecies": "ddc", "terdecies": "tdc", "quaterdecies": "qtdc", "quindecies": "qdc", "sexdecies": "sxdc", "septdecies": "spdc", "octodecies": "odc", "novodecies": "ndc", "vicies": "vc", "unvicies": "uvc", "duovicies": "dvc", "tervicies": "tvc", "quatervicies": "qtvc", "quinvicies": "qvc", "sexvicies": "sxvc", "septvicies": "spvc", "octovicies": "ovc", "novovicies": "nvc", "tricies": "tc", "untricies": "utc", "duotricies": "dtc", "tertricies": "ttc", "quatertricies": "qttc", "quintricies": "qtc", "sextricies": "sxtc", "septtricies": "sptc", "octotricies": "otc", "novotricies": "ntc", "quadragies": "qc", "unquadragies": "uqc", "duoquadragies": "dqc", "terquadragies": "tqc", "quaterquadragies": "qtqc", "quinquadragies": "qqc", "sexquadragies": "sxqc", "septquadragies": "spqc", "octoquadragies": "oqc", "novoquadragies": "nqc", "quinquagies": "pc", "unquinquagies": "upc", "duoquinquagies": "dpc", "terquinquagies": "tpc", "quaterquinquagies": "qtpc", "quinquinquagies": "qpc", "sexquinquagies": "sxpc", "septquinquagies": "sppc", "octoquinquagies": "opc", "novoquinquagies": "npc", "sexagies": "sc", "unsexagies": "usc", "duosexagies": "dsc", "tersexagies": "tsc", "quatersexagies": "qtsc", "quinsexagies": "qsc", "sexsexagies": "sxsc", "septsexagies": "spsc", "octosexagies": "osc", "novosexagies": "nsc"}
-    prefixe = {"additionnel(s) après" : "addap",  "additionnel(s) avant" : "addav", "motion" : "mot", "liminaire" : "lim"}
+    prefixe = {"additionnel(s) après" : "addap",  "additionnel(s) avant" : "addav", "motion" : "mot", "liminaire" : "lim", "unique" : "unq", "intitulé de la proposition de loi" : "intPPL"}
     suffixe = {"état" : "E", "annexe" : "anx"}
     
     article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
@@ -140,15 +147,48 @@ def get_id_article(article : str) :
     id_article = pref + digits + mult + lettre + suf
     return(id_article)
 
+def get_bloc_article(article : str) :
+    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
+    pref = "Article "
+    if "unique" in article :
+        digits = "unique"
+    elif "liminaire" in article :
+        digits = "liminaire"
+    elif "intitulé de la proposition de loi" in article :
+        pref = ""
+        digits = "Int. PPL"
+    elif "motions" in article :
+        pref = ""
+        digits = "Motions"
+    else :
+        digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
+    bloc = pref + digits
+    return(bloc)
+
 
 def get_id_bloc_article(article : str) -> str :   
     article = unicodedata.normalize("NFKC", article).lower()
-    if "Liminaire" in article :
+    if "unique" in article :
+        id_bloc = "unq"
+    elif "liminaire" in article :
         id_bloc = "lim"
-    if "Motion" in article :
+    elif "motion" in article :
         id_bloc = "mot"
-    id_bloc = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article)) # extrait les nombres
+    elif "intitulé de la proposition de loi" in article :
+        id_bloc = "intppl"
+    else :
+        id_bloc = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article)) # extrait les nombres
     return(id_bloc)
+
+# TEST
+print(get_id_bloc_article("Article unique"))
+print(get_id_bloc_article("Intitulé de la proposition de loi"))
+print(get_id_bloc_article("Motions"))
+print(get_id_bloc_article("Article 1er"))
+print(get_id_bloc_article("Article 49 (crédits de la mission) État B"))
+print(get_id_bloc_article("Article(s) additionnel(s) après Article 23 bis"))
+print(get_id_bloc_article("Article(s) additionnel(s) après Article 5 (Supprimé)"))
+print(get_id_bloc_article("Article(s) additionnel(s) après Article 24 (réservé jusqu'après les amendements portant article additionnel après l'article 30)"))
 
 def get_url_articles(url_disc : str):
     try :
@@ -198,15 +238,13 @@ def turn_into_ordre(df : pd.DataFrame, id_disc, ordre) :
     df = df[["id_amdt", "id_partie","ordre_examen_in_partie"]]
     return(df)
 
+# un avec un s et l'autre sans ... faire du tri
 def get_url_article(article : str, id_disc : str):
     url_articles = get_info_from_id(id_disc, "url_txt")
     url_articles = url_articles + "#AMELI_SUB_4__Article_" + get_id_bloc_article(article)
     return(url_articles)
 
-def get_bloc_article(article : str) :
-    article = unicodedata.normalize("NFKC", article).lower()  # \xa0 = espace normal
-    digits = re.sub(r"\D","",re.sub(r"\([^)]*\)", "", article))
-    return(f"Article {digits}")
+
 
 def ffill_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
