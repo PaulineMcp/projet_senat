@@ -142,7 +142,7 @@ def fetch_content(id_disc : str) -> list :
     df_list.append(df_parties)
     df_list.append(df_ordre)
     df_list.append(df_content)
-    print("Contenu de la page récupéré")
+    print("Contenu, parties et ordre récupérés")
     return(df_list)
 
 #def send_content_to_bdd(df_list : list) -> None :
@@ -183,7 +183,6 @@ def fetch_articles_from_texte(id_disc : str) -> pd.DataFrame :
     """Récupère tous les articles identifiés grâce aux URL des textes de loi. Renvoie un df""" 
     # Récupère l'url du texte
     url_articles = get_info_from_id(id_disc, "url_txt")
-    #print(url_articles)
     soup = get_content_page(url_articles)
     articles = soup.find_all("p", {"class": "TCNumArticle"})
 

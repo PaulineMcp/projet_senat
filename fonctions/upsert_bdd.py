@@ -20,4 +20,5 @@ def upsert_df(table: str, df: pd.DataFrame, cle_pk: str) -> None:
                     ON CONFLICT({cle_pk}) DO UPDATE SET {maj}"""
     with get_db() as conn :
             conn.executemany(request, df.itertuples(index=False, name=None))
+    print("Envoi des données en BDD")
              
