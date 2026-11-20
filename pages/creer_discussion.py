@@ -4,16 +4,13 @@
 
 # Import des librairies
 from utils import *
+import traceback
 
 # Fonctions
 from fonctions.fonctions_scrapping_cleaning.fonctions_checking import url_valide, disc_already_exist, is_not_google_doc
 from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import commission_ou_sceance, get_session, get_id_disc, get_url_articles
 from fonctions.fonctions_scrapping_cleaning.fonctions_scrapping import check_url
 from fonctions.init_discussion import init_remplissage_amdts, init_remplissage_articles, init_disc, init_content, init_articles, init_avis
-#from fonctions.init_discussion import fetch_content_amdts
-#from fonctions.init_discussion import fetch_avis
-#from fonctions.init_discussion import init_remplissage_amdts
-#from fonctions.init_discussion import init_remplissage_articles
 
 ###############     PAGE    ###############
 
@@ -83,35 +80,26 @@ with col_centre :
 
 
                     try:
-                        init_disc(url_disc, inputs)
-                        init_content(id_disc)
-                        init_articles(id_disc)
-                        init_avis(id_disc)
-                        init_remplissage_amdts(id_disc)
-                        init_remplissage_articles(id_disc)
-                        st.success("Enregistré")
-                    except Exception as e:
-                        print(f"Erreur : {e}")
+
                         with get_db() as conn:
-                            conn.execute("DELETE FROM discussion WHERE id_disc = ?", (id_disc,))
-                        raise 
 
+                            init_disc(url_disc, inputs, conn=conn)
+                            init_content(id_disc, conn=conn)
+                            init_articles(id_disc, conn=conn)
+                            init_avis(id_disc, conn=conn)
+                            init_remplissage_amdts(id_disc, conn=conn)
+                            init_remplissage_articles(id_disc, conn=conn)
 
-                    #fetch_content(id_disc)
-                    
-                    #fetch_all_articles(id_disc)
-                    #print("articles récupérés")
-                  
+                        # Si on arrive ici, la transaction est validée
+                        st.success("Enregistré")
 
-                    #fetch_avis(id_disc)
-                    #print("AVIS RECUPERES")
+                    except Exception as e:
 
-                    #init_remplissage_amdts(id_disc)
-                    #print("OBJET ET COM INITIALISES")
-                    #init_remplissage_articles(id_disc)
-                    #print("VOTES INITIALISES")
-                    
-
+                        # get_db() a automatiquement effectué le rollback
+                        print(f"Erreur lors de la création : {e}")
+                        traceback.print_exc()
+                        st.error("Une erreur est survenue. Aucune modification n'a été enregistrée.")
+             
     st.space("large")
 
     col_gauche, col_bouton = st.columns([1.7,1])

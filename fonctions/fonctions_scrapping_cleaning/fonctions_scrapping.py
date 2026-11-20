@@ -126,28 +126,46 @@ def parsing_line(line):
 #    df = pd.DataFrame(df)
  #   return(df)
 
-def get_avis_gouv(url):
+import re
+from bs4 import BeautifulSoup
+
+def _extraire_bloc(html: str, nom: str):
+    """Texte entre <!-- debut_nom --> et <!-- fin_nom -->.
+    Renvoie None si les repères sont absents (page d'erreur, structure modifiée)."""
+    m = re.search(rf"<!--\s*debut_{nom}\s*-->(.*?)<!--\s*fin_{nom}\s*-->", html, re.S)
+    if not m:
+        return None
+    texte = " ".join(BeautifulSoup(m.group(1), "html.parser").get_text().split())
+    return texte or "Pas d'avis"
+
+
+def get_avis(url):
+    """Charge la page de l'amendement UNE fois.
+    Renvoie (avis_gouv, avis_com), ou (None, None) si la page n'a pas pu être lue."""
     if not url:
-        return "Pas d'avis"
+        return "Pas d'avis", "Pas d'avis"
     try:
         soup = get_content_page(url)
     except Exception as e:
-        print(f"Avis gouv non récupéré ({url}) : {e}")
-        return None                       # inconnu : on ne touche pas à la base
-    avis = soup.find_all(...)             # ta sélection actuelle, inchangée
-    return " ".join(avis[0].text.split()) if avis else "Pas d'avis"
-               
+        print(f"Avis non récupérés ({url}) : {e}")
+        return None, None
+    if soup is None:
+        return None, None
+
+    html = str(soup)
+    gouv = _extraire_bloc(html, "avis_gouvernement")
+    com = _extraire_bloc(html, "avis_commission")
+    if gouv is None or com is None:          # repères absents : on ne conclut pas "pas d'avis"
+        return None, None
+    return gouv, com
+
+
+# Anciens noms conservés si d'autres fichiers les appellent encore
+def get_avis_gouv(url):
+    return get_avis(url)[0]
 
 def get_avis_com(url):
-    if not url:
-        return "Pas d'avis"
-    try:
-        soup = get_content_page(url)
-    except Exception as e:
-        print(f"Avis non récupéré ({url}) : {e}")
-        return None                      # inconnu : on ne touche pas à la base
-    avis = soup.find_all(...)
-    return " ".join(avis[0].text.split()) if avis else "Pas d'avis"
+    return get_avis(url)[1]
 
 # Récupérer le numéro de lecture
 def get_lecture(soup):

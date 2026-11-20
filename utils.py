@@ -19,19 +19,22 @@ sys.path.insert(0, str(ROOT))
 DB_PATH = Path(__file__).parent / "bdd.db"
 #DB_PATH = Path(__file__).resolve().parent / "bdd.db"
 
-
 @contextmanager
 def get_db():
+
     conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA foreign_keys = ON")
+
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("PRAGMA foreign_keys = ON")
+
         yield conn
+
         conn.commit()
+
     except Exception:
         conn.rollback()
         raise
+
     finally:
         conn.close()
 
