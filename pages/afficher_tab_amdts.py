@@ -208,6 +208,7 @@ if st.button("Sauvegarder les modifications"):
                     """,
                     (id_article, vide(resume) or None),
                 )
+        st.success("Modifications enregistrées")
     except Exception as e:
             st.error(f"Erreur d'enregistrement : {e}")
-    st.success("Modifications enregistrées")
+    

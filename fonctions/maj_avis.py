@@ -27,9 +27,12 @@ with get_db() as conn:
     """, conn)
 
 # Mise à jour des avis
-for id_disc in df_active_disc["id_disc"]:
+total = len(df_active_disc)
+print(total)
 
-    print(f"\nMise à jour des avis : {id_disc}")
+for i, id_disc in enumerate(df_active_disc["id_disc"], start=1):
+
+    print(f"\n[{i}/{total}] Mise à jour des avis : {id_disc}", flush=True)
 
     try:
         # Récupération des avis et mise à jour dans une seule transaction
@@ -48,11 +51,13 @@ for id_disc in df_active_disc["id_disc"]:
                     conn=conn
                 )
 
-                print(f"{len(updated_avis)} avis actualisés.")
+                print(f"   -> {len(updated_avis)} avis actualisés.", flush=True)
 
             else:
-                print("Aucun avis à actualiser.")
+                print("   -> Aucun avis à actualiser.", flush=True)
 
     except Exception as e:
-        print(f"ERREUR lors de la mise à jour de {id_disc} : {e}")
-        print("La discussion n'a pas été actualisée.")
+        print(f"   -> ERREUR lors de la mise à jour de {id_disc} : {e}", flush=True)
+        print("   -> La discussion n'a pas été actualisée.", flush=True)
+
+print("\nMise à jour terminée !", flush=True)

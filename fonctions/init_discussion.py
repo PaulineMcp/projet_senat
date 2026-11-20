@@ -587,6 +587,7 @@ def fetch_avis(id_disc: str, conn=None, pause: float = 0.5) -> pd.DataFrame:
 
     resultats = []
     for id_amdt, lien, cur_gouv, cur_com in df.itertuples(index=False, name=None):
+        print(f"Récupération des avis de :{id_amdt}")
         if com_seance == "Commission":                 # rien à scraper en commission
             gouv, com = "Pas d'avis", "Pas d'avis"
         else:
