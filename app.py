@@ -3,6 +3,11 @@ from utils import *
 from utils import initialiser_db
 
 # Configuration de la page : en premier
+# Paramétrage des paramètres persistants des connexions
+def initialiser_db():
+    with sqlite3.connect(DB_PATH, timeout=30) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys = ON")
 st.set_page_config(layout="wide")
 
 # Initialisation de la base de données
