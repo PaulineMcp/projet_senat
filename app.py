@@ -1,6 +1,5 @@
 # Gestion de la navigation
 from utils import *
-from utils import initialiser_db
 
 # Configuration de la page : en premier
 # Paramétrage des paramètres persistants des connexions
