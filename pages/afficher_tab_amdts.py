@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 
 from fonctions.fonctions_tableau.get_tab_to_aff import retrieve_tab, retrieve_first_tab, retrieve_infos_disc, retrieve_info_articles
 from fonctions.fonctions_tableau.display_tab import display_titre_resume_article, display_vote
-from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article, ffill_df, valeurs_identiques
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article, ffill_df
 from fonctions.init_discussion import vide
 from utils import *
 from fonctions.fonctions_tableau.display_tab import display_tab
@@ -25,6 +25,13 @@ def retrieve_article_list(id_disc : str) -> pd.DataFrame :
             """,
         conn,params=(id_disc,),)
     return(df_articles)
+
+def valeurs_identiques(a, b):
+    if pd.isna(a) and pd.isna(b):
+        return True
+    if pd.isna(a) or pd.isna(b):
+        return False
+    return a == b
 
 ############### STYLE ###############
 

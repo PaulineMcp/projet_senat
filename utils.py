@@ -13,11 +13,6 @@ sys.path.insert(0, str(ROOT))
 
 DB_PATH = Path(__file__).parent / "bdd.db"
 
-# Paramétrage des paramètres persistants des connexions
-def initialiser_db():
-    with sqlite3.connect(DB_PATH, timeout=30) as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys = ON")
 
 
 @contextmanager
