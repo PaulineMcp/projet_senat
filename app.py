@@ -1,5 +1,9 @@
 # Gestion de la navigation
 from utils import *
+from utils import initialiser_db
+
+# Configuration de la page : en premier
+st.set_page_config(layout="wide")
 
 # Initialisation de la base de données
 initialiser_db()
@@ -11,13 +15,10 @@ discussions = st.Page("pages/discussions.py", title="Discussions")
 afficher_tab_amdts = st.Page("pages/afficher_tab_amdts.py", title="Afficher tab amdts")
 vue_seule_tab_amdts = st.Page("pages/vue_seule_tab_amdts.py", title="Afficher tab amdts vue seule")
 tutoriel = st.Page("pages/tutoriel.py", title="Tutoriel")
-test_aggrid = st.Page("pages/test_aggrid.py", title="test_aggrid")
 
-pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts, tutoriel, test_aggrid
+pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts, tutoriel
                     ])
 
-# Header
-st.set_page_config(layout="wide")
 st.markdown(
     """
     <style>
