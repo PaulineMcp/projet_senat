@@ -580,10 +580,10 @@ def fetch_avis(id_disc: str, conn=None, pause: float = 0.5) -> pd.DataFrame:
     if conn is None:
         with get_db() as c:
             df = pd.read_sql(requete, c, params=params)
-            com_seance = get_info_from_id(id_disc, "com_seance")
+            com_seance = get_info_from_id(id_disc,"com_seance", conn=conn if conn is not None else c)
     else:
         df = pd.read_sql(requete, conn, params=params)
-        com_seance = get_info_from_id(id_disc, "com_seance")
+        com_seance = get_info_from_id(id_disc, "com_seance", conn=conn if conn is not None else c)
 
     resultats = []
     for id_amdt, lien, cur_gouv, cur_com in df.itertuples(index=False, name=None):
@@ -667,6 +667,7 @@ def init_remplissage_amdts(
         return
 
     df["objet"] = "À compléter"
+    df["proposition_vote_amdt"] = "À définir"
     df["com"] = ""
     df["proposition_vote_amdt"] = "À définir"
 
@@ -730,5 +731,4 @@ def init_remplissage_articles(
 
 def vide(x):
     """Remplace une valeur manquante par None."""
-
     return None if pd.isna(x) else x

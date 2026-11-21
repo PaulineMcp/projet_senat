@@ -653,3 +653,20 @@ def ffill_df(df: pd.DataFrame) -> pd.DataFrame:
                 df.at[idx, "ordre_examen_in_partie"] = max_value
 
     return df
+
+def retrieve_article_list(id_disc : str) -> pd.DataFrame :
+    with get_db() as conn :
+        df_articles = pd.read_sql(
+            """ SELECT id_article, article
+            FROM articles
+            WHERE id_disc = ?
+            """,
+        conn,params=(id_disc,),)
+    return(df_articles)
+
+def valeurs_identiques(a, b):
+    if pd.isna(a) and pd.isna(b):
+        return True
+    if pd.isna(a) or pd.isna(b):
+        return False
+    return a == b

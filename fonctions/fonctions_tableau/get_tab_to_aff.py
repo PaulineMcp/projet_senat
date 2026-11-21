@@ -109,7 +109,7 @@ def retrieve_infos_disc(id_disc : str):
         )
     return(df_infos_disc)
 
-def retrieve_info_articles(id_disc : str) :
+def retrieve_info_articles(id_disc : str) -> pd.DataFrame :
     with get_db() as conn :
         df_votes_articles = pd.read_sql("""
         SELECT remplissage_ap_article.id_article,

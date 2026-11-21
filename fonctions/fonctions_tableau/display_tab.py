@@ -1,113 +1,243 @@
+
 import pandas as pd
 import streamlit as st
-from fonctions.fonctions_tableau.fonctions_affichage import couleur_sort
-from fonctions.fonctions_tableau.fonctions_affichage import couleur_parti
-from fonctions.fonctions_tableau.fonctions_affichage import get_row_height
+#from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-OPTIONS = ["🟢 Pour", "🟡 Plutôt pour", "🟠 Plutôt contre", "🔴 Contre", "⚪️ Abstention", "🔵 Selon débat"]
+from fonctions.fonctions_tableau.fonctions_affichage import couleur_sort, couleur_parti
+
+OPTIONS = [
+    "🟢 Pour",
+    "🟡 Plutôt pour",
+    "🟠 Plutôt contre",
+    "🔴 Contre",
+    "⚪️ Abstention",
+    "🔵 Selon débat"
+]
 
 
-def display_tab(df_by_article : pd.DataFrame, article : str, id_partie : str) -> pd.DataFrame :
-    row_height = get_row_height(df_by_article, {"objet": 200, "com": 200})
-    hauteur_tab = 35 + len(df_by_article) * row_height + 3
+def put_modifications_into_session_state(base, data_editor_key, row_ids_amdt):
+    """ Récupère les modifications du data_editor et les stocke par id_amdt dans le session_state de l'utilisateur"""
 
-    df_stylise = (df_by_article.style
-                            .map(couleur_sort, subset = ["sort"])
-                            .map(couleur_parti, subset = ["nom_groupe"]))
-                
-    df_edite = st.data_editor(
-        df_stylise,
-        row_height = row_height,
-        key=f"editeur_{id_partie}_{article}",
-        column_order=["abrev_article","lien_article", "amdt", "lien_amdt", "nom_groupe","objet", "com", "avis_com", "avis_gouv", "proposition_vote_amdt", "sort"],
-        column_config={
-            "abrev_article": st.column_config.TextColumn("Article", width= 75),
-            "lien_article": st.column_config.LinkColumn("", display_text="🔗", width=20),
-            "amdt": st.column_config.TextColumn("Amdt", width=100),
-            "lien_amdt": st.column_config.LinkColumn("", display_text="🔗", width=20),
-            "nom_groupe": st.column_config.TextColumn("Auteur·rice", width=140),
-            "objet": st.column_config.TextColumn("Objet", width=240),
-            "avis_gouv": st.column_config.TextColumn("Avis gouv", width=110),
-            "avis_com": st.column_config.TextColumn("Avis com", width=110),
-            "proposition_vote_amdt": st.column_config.SelectboxColumn("Prop. vote", options=OPTIONS, width=110),
-            "sort": st.column_config.TextColumn("Sort", width=100),
-        },
-        disabled=["article", "lien_article", "amdt", "lien_amdt", "nom_groupe","avis_gouv", "avis_com", "sort"],
-        hide_index=True,
-        height = hauteur_tab,
-        width="stretch",
+    ss = st.session_state    # Accéder au session state
+    pending = ss.setdefault("pending_amdt", {}) # Initialiser un dict "pending_amdt" ou le récupère s'il existe
+    state = ss.get(data_editor_key, {}) # ??
+
+    # Associer à chaque position-modif l'id_amdt correspondant
+    for position, modifications in state.get("edited_rows", {}).items():
+
+        position = int(position)
+
+        # Sécurité
+        if position >= len(row_ids_amdt):
+            continue
+        else : 
+            id_amdt = row_ids_amdt[position]
+
+        # Sécurité
+        if id_amdt is None:
+            continue
+
+        entree = pending.setdefault(id_amdt, {})
+
+        for colonne, valeur in modifications.items():
+            if colonne in ["objet", "com", "proposition_vote_amdt"]:
+                entree[colonne] = valeur
+
+    # Nouveau widget au prochain rerun
+    version_key = f"version_{base}"
+    ss[version_key] = ss.get(version_key, 0) + 1
+
+
+def editeur_stable(df, base, **kwargs) -> pd.DataFrame:
+    """ Data editor qui conserve les modifications par id_amdt. Les modifications non sauvegardées restent propres à la session de chaque utilisateur."""
+    
+    ss = st.session_state
+    pending = ss.setdefault("pending_amdt", {})  # Initialiser un dict "pending_amdt" ou le récupère s'il existe
+
+    # Identifiants dans l'ordre du tableau actuel
+    row_ids = [None if pd.isna(id_amdt) else str(id_amdt) for id_amdt in df["id_amdt"].tolist()]
+
+    # Détection des changements de lignes ou de leur ordre
+    ids_key = f"ids_{base}"
+    version_key = f"version_{base}"
+    anciens_ids = ss.get(ids_key)
+
+    if anciens_ids is not None and anciens_ids != row_ids:
+        ss[version_key] = ss.get(version_key, 0) + 1
+
+    ss[ids_key] = row_ids
+
+    version = ss.get(version_key, 0)
+    widget_key = f"editeur_{base}_{version}"
+
+    # Réapplication des modifications non sauvegardées
+    affiche = df.copy()
+
+    for id_amdt, modifications in pending.items():
+        masque = affiche["id_amdt"].astype("string") == id_amdt
+        for colonne, valeur in modifications.items():
+            if colonne in ["objet", "com", "proposition_vote_amdt"]:
+                affiche.loc[masque, colonne] = valeur
+
+    # Style du tableau
+    style_fn = kwargs.pop("style_fn", None)
+
+    if style_fn is not None:
+        affiche = style_fn(affiche)
+
+    # Affichage
+    return st.data_editor(
+        affiche,
+        key=widget_key,
+        on_change= put_modifications_into_session_state,
+        args=(base, widget_key, row_ids),
+        **kwargs
     )
+
+def appliquer_style(df):
+        return (
+            df.style
+            .map(couleur_sort, subset=["sort"])
+            .map(couleur_parti, subset=["nom_groupe"])
+        )
+
+def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd.DataFrame:
+
+    st.markdown(
+    """
+    <style>
+    div[data-testid="stDataEditor"] [role="gridcell"] {
+        padding: 8px 5px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+    
+    row_height = 200 #get_row_height(df_by_article,{"objet": 200, "com": 200})
+    hauteur_tab = 35 + len(df_by_article) * row_height + 3
+    df_edite = editeur_stable(df_by_article,
+                            base=f"{id_partie}_{article}",
+                            style_fn=appliquer_style,
+                            row_height=row_height,
+                            column_order=["abrev_article", "lien_article", "amdt","lien_amdt","nom_groupe","objet", "com", "avis_com","avis_gouv","proposition_vote_amdt","sort"],
+                            column_config={
+                                    "abrev_article": st.column_config.TextColumn("Article", width=80),
+                                    "lien_article": st.column_config.LinkColumn("",display_text="🔗",width=30),
+                                    "amdt": st.column_config.TextColumn("Amdt",width=60),
+                                    "lien_amdt": st.column_config.LinkColumn("",display_text="🔗",width=30),
+                                    "nom_groupe": st.column_config.TextColumn("Auteur·rice",width=100),
+                                    "objet": st.column_config.TextColumn("Objet", width = 450),
+                                    "com": st.column_config.TextColumn("Com",width=300),
+                                    "avis_gouv": st.column_config.TextColumn("Avis gouv",width=90),
+                                    "avis_com": st.column_config.TextColumn("Avis com",width=90),
+                                    "proposition_vote_amdt": st.column_config.SelectboxColumn("Prop. vote",options=OPTIONS,width=100),
+                                    "sort": st.column_config.TextColumn("Sort",width=60),},
+                            disabled=["article","lien_article","amdt","lien_amdt","nom_groupe","avis_gouv","avis_com","sort"],
+                            hide_index=True,
+                            height=hauteur_tab,
+                            width="content",)
+
     return(df_edite)
 
-def display_vote(est_additionnel : bool, dict_votes_articles : dict, id_article : str, article : str, votes : dict):
+def display_vote(est_additionnel: bool, dict_votes_articles: dict, id_article: str, article: str, votes: dict):
+
     if not est_additionnel:
         col_vote, col_droite = st.columns(2)
+
         with col_vote:
             with st.container(horizontal=True):
                 st.write(f"Vote sur {article}")
-                col, _ = st.columns([1, 1])
-                with col:
-                    vote_actuel = dict_votes_articles.get(str(id_article))
+                col_gauche, col_droite = st.columns([1, 1])
+
+                with col_gauche:
+
+                    key = f"vote_{id_article}"
+                    db_key = f"dernier_vote_db_{id_article}"
+
+                    # Valeur actuellement enregistrée dans SQLite
+                    vote_db = dict_votes_articles.get(str(id_article))
+
+                    # Première apparition du widget
+                    if key not in st.session_state:
+                        st.session_state[key] = vote_db
+                        st.session_state[db_key] = vote_db
+
+                    else:
+                        ancien_vote_db = st.session_state.get(db_key, vote_db)
+                        vote_local = st.session_state[key]
+
+                        # Si aucune modification locale n'est en attente
+                        if vote_local == ancien_vote_db:
+                            st.session_state[key] = vote_db
+
+                        # Mémorisation de la dernière valeur connue en base
+                        st.session_state[db_key] = vote_db
+
                     votes[id_article] = st.selectbox(
                         f"vote-{id_article}",
                         OPTIONS,
-                        index=OPTIONS.index(vote_actuel) if vote_actuel in OPTIONS else None,
+                        index=None,
                         placeholder="Sélectionner un vote",
-                        key=f"vote_{id_article}",
+                        key=key,
                         label_visibility="collapsed",
-                        )
+                    )
+                    st.write("Pensez à sauvegarder ! 💾")
 
-def display_titre_resume_article(id_article : str, article : str, dict_resumes : dict, resumes : dict):
-    col_gauche, col_centre, col_droite = st.columns([1, 2, 1])
-    with col_centre:
-        with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="center"):
-            st.markdown(f"<div style='font-size:24px; font-weight:600; margin:0; padding:0;'>{article}</div>", unsafe_allow_html=True,)
 
-                # Récupère le résumé pour cette clé "id_article"
-            resume_actuel = dict_resumes.get(str(id_article))
-            if resume_actuel is None or pd.isna(resume_actuel):
-                resume_actuel = ""
-            resumes[id_article] = st.text_input(
-                        key=f"resum_{id_article}",
-                        label="Résumé",
-                        label_visibility="collapsed",
-                        value=resume_actuel,
-                        placeholder="Tapez ici le résumé de l'article",
-                    ) 
+def display_titre_resume_article(id_article: str, article: str, dict_resumes: dict, resumes: dict):
 
-def editeur_stable(df, base, **kwargs):
-    """data_editor qui garde les saisies par id_amdt, même si le tableau change entre deux reruns.
-    df doit contenir les colonnes id_amdt et version ; base identifie le tableau (ex. f"{id_partie}_{id_article}")."""
-    ss = st.session_state
-    pending = ss.setdefault(f"pending_{base}", {})     # {id_amdt: {"com": "...", "_version": 3}}
-    prev = ss.get(f"prev_{base}")                      # (ids, versions) du tableau passé au rerun précédent
-    ver = ss.get(f"ver_{base}", 0)
-    key = f"editeur_{base}_{ss.get('epoch', 0)}_{ver}"
+    key = f"resum_{id_article}"
+    db_key = f"dernier_resume_db_{id_article}"
 
-    # 1. Traduire les saisies "par position" du widget en saisies "par id_amdt"
-    state = ss.get(key)
-    if state and prev:
-        ids_prev, versions_prev = prev
-        for pos, changes in state.get("edited_rows", {}).items():
-            i = int(pos)
-            entree = pending.setdefault(ids_prev[i], {"_version": versions_prev[i]})
-            entree.update(changes)
+    # Valeur actuellement enregistrée dans SQLite
+    resume_db = dict_resumes.get(str(id_article))
 
-    # 2. Lignes différentes d'un rerun à l'autre : widget vierge, tout est déjà dans pending
-    ids = list(df["id_amdt"])
-    if prev and prev[0] != ids:
-        ver += 1
-        ss[f"ver_{base}"] = ver
-        key = f"editeur_{base}_{ss.get('epoch', 0)}_{ver}"
+    if resume_db is None or pd.isna(resume_db):
+        resume_db = ""
+    else:
+        resume_db = str(resume_db)
 
-    # 3. Réappliquer les saisies sur le tableau frais, par id_amdt
-    affiche = df.copy()
-    for id_amdt, entree in pending.items():
-        masque = affiche["id_amdt"] == id_amdt
-        if masque.any():
-            for col, val in entree.items():
-                if col != "_version":
-                    affiche.loc[masque, col] = val
+    # Première apparition du widget
+    if key not in st.session_state:
+        st.session_state[key] = resume_db
+        st.session_state[db_key] = resume_db
 
-    ss[f"prev_{base}"] = (ids, list(df["version"]))
-    return st.data_editor(affiche, key=key, **kwargs)
+    else:
+        # Dernière valeur connue de SQLite
+        ancien_resume_db = st.session_state.get(db_key, resume_db)
+
+        # Valeur actuellement présente dans le widget
+        resume_local = st.session_state[key]
+
+        # Si aucune modification locale n'est en attente,
+        # on peut actualiser le widget avec la nouvelle valeur SQLite
+        if resume_local == ancien_resume_db:
+            st.session_state[key] = resume_db
+
+        # On mémorise la dernière valeur connue de SQLite
+        st.session_state[db_key] = resume_db
+
+    with st.container(
+        horizontal=True,
+        horizontal_alignment="center",
+        vertical_alignment="center"
+    ):
+
+        st.markdown(
+            f"""
+            <div id="article-{id_article}" class="titre-article"
+                style="display:flex; align-items:center; gap:8px;font-size:24px; font-weight:600; margin:0; padding:0;">
+                <a class="ancre" href="#article-{id_article}">🔗</a>
+                <span>{article}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        resumes[id_article] = st.text_input(
+            key=key,
+            label="Résumé",
+            label_visibility="collapsed",
+            placeholder="Tapez ici le résumé de l'article",
+        )
