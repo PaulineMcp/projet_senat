@@ -114,7 +114,7 @@ def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd
     unsafe_allow_html=True,
 )
     
-    row_height = 200 #get_row_height(df_by_article,{"objet": 200, "com": 200})
+    row_height = 75 #get_row_height(df_by_article,{"objet": 200, "com": 200})
     hauteur_tab = 35 + len(df_by_article) * row_height + 3
     df_edite = editeur_stable(df_by_article,
                             base=f"{id_partie}_{article}",

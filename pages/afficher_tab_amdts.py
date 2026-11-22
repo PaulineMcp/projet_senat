@@ -158,17 +158,21 @@ def sauvegarder_modifications(votes : dict, resumes: dict) -> bool:
 
 ############### AFFICHAGE DE LA PAGE ###############
 
-@st.fragment(run_every="180s")
+@st.fragment(run_every="1800s")
 def afficher_page(search):
 
     # Récupération des données
     df_first_partie = retrieve_first_tab(search)
     df_all_partie = retrieve_tab(search)
-    articles = retrieve_article_list(search).dropna().drop_duplicates()
+    #articles = retrieve_article_list(search).dropna().drop_duplicates()
 
     df_all_partie["abrev_article"] = (df_all_partie["article"].apply(abrev_article))
     df_first_partie["abrev_article"] = (df_first_partie["article"].apply(abrev_article))
 
+    df_all_partie["bloc"] = (pd.to_numeric(df_all_partie["bloc"],errors="coerce").astype("Int64"))
+    df_first_partie["bloc"] = (pd.to_numeric(df_first_partie["bloc"],errors="coerce").astype("Int64"))
+
+    parties = (df_all_partie[["id_partie", "titre_partie"]].dropna().drop_duplicates())
     # Informations de la discussion
     df_infos_disc = retrieve_infos_disc(search)
     titre_discussion = df_infos_disc["titre_disc_long"].iloc[0]
@@ -210,8 +214,10 @@ def afficher_page(search):
 
     ############### TABLEAUX ###############
 
+#    df_first_partie["bloc"] = (pd.to_numeric(df_first_partie["bloc"],errors="coerce").astype("Int64"))
+    #st.dataframe(df_first_partie)
     # Liste des parties
-    parties = (df_all_partie[["id_partie", "titre_partie"]].dropna().drop_duplicates())
+    
     for id_partie, titre_partie in parties.itertuples(index=False,name=None):
 
         st.header(titre_partie, anchor = id_partie)
@@ -219,19 +225,24 @@ def afficher_page(search):
         # Si c'est la première partie
         if str(id_partie).endswith("p1"):
             
+            
 
-            # Conversion de la colonne "bloc" en Int64 pour permettre le tri // A terme faut supprimer cette col
-            df_first_partie["bloc"] = (pd.to_numeric(df_first_partie["bloc"],errors="coerce").astype("Int64"))
-
+#            
+            df_first_partie = df_first_partie.sort_values(["bloc", "ordre_examen_in_partie"])
+            #st.dataframe(df_first_partie)
             # Propagation des valeurs de l'ordre d'examen (pour les articles qui n'ont pas d'amendement donc pas d'ordre)
             df_first_partie = ffill_df(df_first_partie)
-            df_first_partie = (df_first_partie.sort_values(["ordre_examen_in_partie", "bloc"]).reset_index(drop=True))
+#            df_first_partie = df_first_partie[df_first_partie["is_active"] == 1]
+            df_first_partie = df_first_partie.sort_values(["bloc", "ordre_examen_in_partie"])
+#           df_first_partie = (df_first_partie.sort_values(["ordre_examen_in_partie", "bloc"]).reset_index(drop=True))
+            ###st.dataframe(df_first_partie)
 
             # Liste des articles
             ###articles = (df_first_partie[["id_article", "article"]].dropna().drop_duplicates())
-            for id_article, article in articles.itertuples(index=False,name=None):
+            for id_article, article in df_first_partie[["id_article","article"]].drop_duplicates().itertuples(index = False) :
 
                 df_by_article = (df_first_partie[df_first_partie["id_article"] == id_article])
+                df_by_article = df_by_article[df_by_article["is_active"] == 1]
                 df_by_article["nom_groupe"] = (df_by_article["nom_groupe"].fillna(df_by_article["auteur"]))
 
                 # Titre et résumé de l'article
@@ -252,13 +263,20 @@ def afficher_page(search):
 
         ############### AUTRES PARTIES ###############
         else:
+            st.dataframe(df_all_partie)
+            
             df_by_partie = (df_all_partie[df_all_partie["id_partie"] == id_partie])
+            df_by_partie = df_by_partie.sort_values(["bloc", "ordre_examen_in_partie"])
+            df_by_partie = ffill_df(df_by_partie)
+            df_by_partie["nom_groupe"] = (df_by_partie["nom_groupe"].fillna(df_by_partie["auteur"]))
+            df_by_partie = df_by_partie.sort_values(["bloc", "ordre_examen_in_partie"])
 
-            for id_article, article in articles.itertuples(index=False, name=None):
-
+            for id_article, article in df_by_partie[["id_article","article"]].drop_duplicates().itertuples(index = False):
                 df_by_article = (df_by_partie[df_by_partie["id_article"] == id_article])
+                df_by_article = df_by_article[df_by_article["is_active"] == 1]
 
                 # Titre
+                #display_titre_resume_article(id_article, article, dict_resumes, resumes)
                 col_gauche, col_centre, col_droite = st.columns([1, 2, 1])
                 with col_centre:
                     with st.container(horizontal=True, horizontal_alignment="center", vertical_alignment="center"):
@@ -300,8 +318,34 @@ def exporter_bdd() -> bytes:
             return f.read()
 
 st.download_button(
-    "Télécharger une copie de la base",
+    "Télécharger une copie de la base en .DB",
     data=exporter_bdd(),
     file_name="ma_base_backup.db",
     mime="application/octet-stream",
+)
+
+
+
+def convert_for_download(df):
+    return df.to_csv().encode("utf-8")
+
+df_for_download = retrieve_tab(search)
+
+df_for_download["abrev_article"] = (df_for_download["article"].apply(abrev_article))
+df_for_download["bloc"] = (pd.to_numeric(df_for_download["bloc"],errors="coerce").astype("Int64"))
+df_for_download = df_for_download.sort_values(["bloc", "ordre_examen_in_partie"])
+df_for_download = ffill_df(df_for_download)
+df_for_download["nom_groupe"] = (df_for_download["nom_groupe"].fillna(df_for_download["auteur"]))
+df_for_download = df_for_download.sort_values(["bloc", "ordre_examen_in_partie"])
+df_for_download = df_for_download[df_for_download["is_active"] == 1]
+df_for_download = df_for_download[["abrev_article", "amdt","nom_groupe", "lien_amdt", "lien_article", "objet", "com", "avis_com", "avis_gouv", "proposition_vote_amdt", "sort"]]
+
+csv = convert_for_download(df_for_download)
+
+st.download_button(
+    label="Télécharger en CSV",
+    data=csv,
+    file_name="tableau.csv",
+    mime="text/csv",
+    icon=":material/download:",
 )

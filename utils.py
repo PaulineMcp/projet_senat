@@ -13,8 +13,6 @@ sys.path.insert(0, str(ROOT))
 
 DB_PATH = Path(__file__).parent / "bdd.db"
 
-
-
 @contextmanager
 def get_db():
     conn = None

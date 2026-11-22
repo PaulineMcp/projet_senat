@@ -2,5 +2,9 @@
 toolbarMode = "minimal"
 showSidebarNavigation = false
 [theme]
-base = "dark"
+base = "light"
+primaryColor = "#347F76"
+backgroundColor = "#c7c4bd"
+secondaryBackgroundColor = "#E7E5DE"
+textColor = "#283B46"
 borderColor = "#1c2b2e"
