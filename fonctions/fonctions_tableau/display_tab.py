@@ -16,24 +16,21 @@ OPTIONS = [
 
 
 def put_modifications_into_session_state(base, data_editor_key, row_ids_amdt):
-    """ Récupère les modifications du data_editor et les stocke par id_amdt dans le session_state de l'utilisateur"""
+    """Récupère les modifications du data_editor et les stocke par id_amdt."""
 
-    ss = st.session_state    # Accéder au session state
-    pending = ss.setdefault("pending_amdt", {}) # Initialiser un dict "pending_amdt" ou le récupère s'il existe
-    state = ss.get(data_editor_key, {}) # ??
+    ss = st.session_state
+    pending = ss.setdefault("pending_amdt", {})
+    state = ss.get(data_editor_key, {})
 
-    # Associer à chaque position-modif l'id_amdt correspondant
     for position, modifications in state.get("edited_rows", {}).items():
 
         position = int(position)
 
-        # Sécurité
         if position >= len(row_ids_amdt):
             continue
-        else : 
-            id_amdt = row_ids_amdt[position]
 
-        # Sécurité
+        id_amdt = row_ids_amdt[position]
+
         if id_amdt is None:
             continue
 
@@ -42,10 +39,6 @@ def put_modifications_into_session_state(base, data_editor_key, row_ids_amdt):
         for colonne, valeur in modifications.items():
             if colonne in ["objet", "com", "proposition_vote_amdt"]:
                 entree[colonne] = valeur
-
-    # Nouveau widget au prochain rerun
-    version_key = f"version_{base}"
-    ss[version_key] = ss.get(version_key, 0) + 1
 
 
 def editeur_stable(df, base, **kwargs) -> pd.DataFrame:

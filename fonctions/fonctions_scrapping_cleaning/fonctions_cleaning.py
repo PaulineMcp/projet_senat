@@ -548,3 +548,5 @@ def get_id_article(article: str):
             suf = code + texte[-1].upper() if cle == "état" else code
 
     return pref + nature + digits + mult + lettre + suf
+
+print(get_id_article("Motion"))
