@@ -43,7 +43,7 @@ def put_modifications_into_session_state(base, data_editor_key, row_ids_amdt):
 
 def editeur_stable(df, base, **kwargs) -> pd.DataFrame:
     """ Data editor qui conserve les modifications par id_amdt. Les modifications non sauvegardées restent propres à la session de chaque utilisateur."""
-    
+
     ss = st.session_state
     pending = ss.setdefault("pending_amdt", {})  # Initialiser un dict "pending_amdt" ou le récupère s'il existe
 
@@ -62,6 +62,7 @@ def editeur_stable(df, base, **kwargs) -> pd.DataFrame:
 
     version = ss.get(version_key, 0)
     widget_key = f"editeur_{base}_{version}"
+    st.write("DEBUG :", widget_key)
 
     # Réapplication des modifications non sauvegardées
     affiche = df.copy()
@@ -111,7 +112,7 @@ def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd
     hauteur_tab = 35 + len(df_by_article) * row_height + 3
     df_edite = editeur_stable(df_by_article,
                             base=f"{id_partie}_{article}",
-                            style_fn=appliquer_style,
+                            style_fn=None,
                             row_height=row_height,
                             column_order=["abrev_article", "lien_article", "amdt","lien_amdt","nom_groupe","objet", "com", "avis_com","avis_gouv","proposition_vote_amdt","sort"],
                             column_config={
