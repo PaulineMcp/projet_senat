@@ -62,7 +62,6 @@ def editeur_stable(df, base, **kwargs) -> pd.DataFrame:
 
     version = ss.get(version_key, 0)
     widget_key = f"editeur_{base}_{version}"
-    st.write("DEBUG :", widget_key)
 
     # Réapplication des modifications non sauvegardées
     affiche = df.copy()
