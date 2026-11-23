@@ -35,8 +35,7 @@ from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import (
     is_ss_amdt,
     get_info_from_id,
     turn_into_content,
-    turn_into_ordre,
-    get_bloc_article
+    turn_into_ordre
 )
 
 from fonctions.fonctions_scrapping_cleaning.fonctions_scrapping import (
@@ -428,6 +427,36 @@ def fetch_articles_from_texte(
 
     return pd.DataFrame(df).drop_duplicates()
 
+def get_bloc_article(article: str):
+
+    article = unicodedata.normalize(
+        "NFKC", article
+    ).lower()
+
+    pref = "Article "
+
+    if "unique" in article:
+        digits = "unique"
+
+    elif "liminaire" in article:
+        digits = "liminaire"
+
+    elif "intitulé de la proposition de loi" in article:
+        pref = ""
+        digits = "Int. PPL"
+
+    elif "motions" in article:
+        pref = ""
+        digits = "Motions"
+
+    else:
+        digits = re.sub(
+            r"\D", "",
+            re.sub(r"\([^)]*\)", "", article)
+        )
+
+    return pref + digits
+
 
 def fetch_articles_from_amdts(
     id_disc: str,
@@ -509,7 +538,6 @@ def fetch_articles_from_amdts(
     ]
 
     return df
-
 
 def init_articles(id_disc: str, conn=None) -> None:
     """Récupère et enregistre les articles."""

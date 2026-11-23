@@ -140,95 +140,190 @@ def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd
 
     return(df_edite)
 
-def display_vote(est_additionnel: bool, dict_votes_articles: dict, id_article: str, article: str, votes: dict):
+
+def synchroniser_vote(id_article, key_source, toutes_les_cles):
+    """
+    Synchronise les selectbox d'un même article.
+    """
+    nouvelle_valeur = st.session_state[key_source]
+
+    st.session_state[f"vote_commun_{id_article}"] = nouvelle_valeur
+
+    for key in toutes_les_cles:
+        if key != key_source:
+            st.session_state[key] = nouvelle_valeur
+
+
+def display_vote(
+    est_additionnel: bool,
+    dict_votes_articles: dict,
+    id_article: str,
+    article: str,
+    votes: dict,
+    id_partie: str
+):
 
     if not est_additionnel:
+
+        id_article = str(id_article)
+        id_partie = str(id_partie)
+
         col_vote, col_droite = st.columns(2)
 
         with col_vote:
             with st.container(horizontal=True):
+
                 st.write(f"Vote sur {article}")
+
                 col_gauche, col_droite = st.columns([1, 1])
 
                 with col_gauche:
 
-                    key = f"vote_{id_article}"
+                    # Une clé distincte par occurrence
+                    key = f"vote_{id_article}_{id_partie}"
+
+                    # Clés communes
+                    vote_commun_key = f"vote_commun_{id_article}"
                     db_key = f"dernier_vote_db_{id_article}"
+                    cles_key = f"cles_vote_{id_article}"
 
-                    # Valeur actuellement enregistrée dans SQLite
-                    vote_db = dict_votes_articles.get(str(id_article))
+                    # Valeur enregistrée dans SQLite
+                    vote_db = dict_votes_articles.get(id_article)
 
-                    # Première apparition du widget
-                    if key not in st.session_state:
-                        st.session_state[key] = vote_db
+                    # Initialisation de la liste des widgets
+                    if cles_key not in st.session_state:
+                        st.session_state[cles_key] = []
+
+                    # Initialisation ou actualisation du vote commun
+                    if vote_commun_key not in st.session_state:
+                        st.session_state[vote_commun_key] = vote_db
                         st.session_state[db_key] = vote_db
 
                     else:
-                        ancien_vote_db = st.session_state.get(db_key, vote_db)
-                        vote_local = st.session_state[key]
+                        ancien_vote_db = st.session_state.get(
+                            db_key, vote_db
+                        )
 
-                        # Si aucune modification locale n'est en attente
+                        vote_local = st.session_state[vote_commun_key]
+
+                        # Actualisation depuis SQLite uniquement si
+                        # aucune modification locale n'est en attente
                         if vote_local == ancien_vote_db:
-                            st.session_state[key] = vote_db
+                            st.session_state[vote_commun_key] = vote_db
 
-                        # Mémorisation de la dernière valeur connue en base
                         st.session_state[db_key] = vote_db
 
+                    # Enregistrement de cette occurrence
+                    if key not in st.session_state[cles_key]:
+                        st.session_state[cles_key].append(key)
+
+                    # Initialisation avant création du widget
+                    if key not in st.session_state:
+                        st.session_state[key] = st.session_state[
+                            vote_commun_key
+                        ]
+
                     votes[id_article] = st.selectbox(
-                        f"vote-{id_article}",
+                        f"vote-{id_article}-{id_partie}",
                         OPTIONS,
                         index=None,
                         placeholder="Sélectionner un vote",
                         key=key,
                         label_visibility="collapsed",
+                        on_change=synchroniser_vote,
+                        args=(
+                            id_article,
+                            key,
+                            st.session_state[cles_key].copy()
+                        )
                     )
+
+                    # Valeur commune destinée à la sauvegarde
+                    votes[id_article] = st.session_state[vote_commun_key]
+
                     st.write("Pensez à sauvegarder ! 💾")
 
 
-def display_titre_resume_article(id_article: str, article: str, dict_resumes: dict, resumes: dict):
+def synchroniser_resume(id_article, key_source, toutes_les_cles):
+    nouvelle_valeur = st.session_state[key_source]
 
-    key = f"resum_{id_article}"
+    st.session_state[f"resume_commun_{id_article}"] = nouvelle_valeur
+
+    # Sauvegarde persistante de la modification
+    st.session_state.setdefault("pending_resumes", {})
+    st.session_state["pending_resumes"][id_article] = nouvelle_valeur
+
+    for key in toutes_les_cles:
+        if key != key_source:
+            st.session_state[key] = nouvelle_valeur
+
+
+def display_titre_resume_article(
+    id_article: str,
+    article: str,
+    id_partie: str,
+    dict_resumes: dict,
+    resumes: dict
+):
+    id_article = str(id_article)
+    id_partie = str(id_partie)
+
+    # Clé unique pour chaque occurrence
+    key = f"resum_{id_article}_{id_partie}"
+
+    # Clés communes à toutes les occurrences
+    resume_commun_key = f"resume_commun_{id_article}"
     db_key = f"dernier_resume_db_{id_article}"
+    cles_key = f"cles_resume_{id_article}"
 
-    # Valeur actuellement enregistrée dans SQLite
-    resume_db = dict_resumes.get(str(id_article))
+    # Récupération du résumé depuis SQLite
+    resume_db = dict_resumes.get(id_article)
 
     if resume_db is None or pd.isna(resume_db):
         resume_db = ""
     else:
         resume_db = str(resume_db)
 
-    # Première apparition du widget
-    if key not in st.session_state:
-        st.session_state[key] = resume_db
+    # Initialisation de la liste des widgets
+    if cles_key not in st.session_state:
+        st.session_state[cles_key] = []
+
+    # Initialisation du résumé commun
+    if resume_commun_key not in st.session_state:
+        st.session_state[resume_commun_key] = resume_db
         st.session_state[db_key] = resume_db
 
     else:
-        # Dernière valeur connue de SQLite
         ancien_resume_db = st.session_state.get(db_key, resume_db)
+        resume_local = st.session_state[resume_commun_key]
 
-        # Valeur actuellement présente dans le widget
-        resume_local = st.session_state[key]
+        # Actualisation depuis SQLite uniquement si aucune
+        # modification locale n'est en attente
+        if resume_local == ancien_resume_db and resume_db != ancien_resume_db:
+            st.session_state[resume_commun_key] = resume_db
 
-        # Si aucune modification locale n'est en attente,
-        # on peut actualiser le widget avec la nouvelle valeur SQLite
-        if resume_local == ancien_resume_db:
-            st.session_state[key] = resume_db
-
-        # On mémorise la dernière valeur connue de SQLite
         st.session_state[db_key] = resume_db
 
+    # Enregistrement de cette occurrence
+    if key not in st.session_state[cles_key]:
+        st.session_state[cles_key].append(key)
+
+    # Initialisation du widget avant sa création
+    if key not in st.session_state:
+        st.session_state[key] = st.session_state[resume_commun_key]
+
+    # Titre et champ de résumé
     with st.container(
         horizontal=True,
         horizontal_alignment="center",
         vertical_alignment="center"
     ):
-
         st.markdown(
             f"""
-            <div id="article-{id_article}" class="titre-article"
-                style="display:flex; align-items:center; gap:8px;font-size:24px; font-weight:600; margin:0; padding:0;">
-                <a class="ancre" href="#article-{id_article}">🔗</a>
+            <div id="article-{id_article}-{id_partie}" class="titre-article"
+                style="display:flex; align-items:center; gap:8px;
+                font-size:24px; font-weight:600; margin:0; padding:0;">
+                <a class="ancre" href="#article-{id_article}-{id_partie}">🔗</a>
                 <span>{article}</span>
             </div>
             """,
@@ -240,4 +335,13 @@ def display_titre_resume_article(id_article: str, article: str, dict_resumes: di
             label="Résumé",
             label_visibility="collapsed",
             placeholder="Tapez ici le résumé de l'article",
+            on_change=synchroniser_resume,
+            args=(
+                id_article,
+                key,
+                st.session_state[cles_key].copy()
+            )
         )
+
+    # Valeur commune disponible pour la sauvegarde
+    resumes[id_article] = st.session_state[resume_commun_key]

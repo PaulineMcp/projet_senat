@@ -53,14 +53,12 @@ def retrieve_tab(id_disc : str) :
                                 ON avis.id_amdt = amdts.id_amdt
                             LEFT JOIN remplissage_ap_amdt
                                 ON amdts.id_amdt = remplissage_ap_amdt.id_amdt
-                            WHERE discussion.id_disc = ? AND amdts.is_active = 1
-                            ORDER BY parties.ordre_partie
+                            WHERE discussion.id_disc = ?
                         """,
                         conn,
                         params = (id_disc,))
     return(df)
 
-## conservation
 def retrieve_first_tab(id_disc : str) :
     with get_db() as conn :
         df = pd.read_sql("""SELECT articles.id_bloc_article,

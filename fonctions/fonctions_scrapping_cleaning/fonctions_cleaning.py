@@ -203,185 +203,6 @@ def abrev_article(article: str):
     return abrev
 
 
-def get_id_article(article: str):
-
-    multiplicatif = {
-        "bis": "b",
-        "ter": "t",
-        "quater": "qt",
-        "quinquies": "qq",
-        "sexies": "sx",
-        "septies": "sp",
-        "octies": "oc",
-        "nonies": "nn",
-        "decies": "dc",
-        "undecies": "udc",
-        "duodecies": "ddc",
-        "terdecies": "tdc",
-        "quaterdecies": "qtdc",
-        "quindecies": "qdc",
-        "sexdecies": "sxdc",
-        "septdecies": "spdc",
-        "octodecies": "odc",
-        "novodecies": "ndc",
-        "vicies": "vc",
-        "unvicies": "uvc",
-        "duovicies": "dvc",
-        "tervicies": "tvc",
-        "quatervicies": "qtvc",
-        "quinvicies": "qvc",
-        "sexvicies": "sxvc",
-        "septvicies": "spvc",
-        "octovicies": "ovc",
-        "novovicies": "nvc",
-        "tricies": "tc",
-        "untricies": "utc",
-        "duotricies": "dtc",
-        "tertricies": "ttc",
-        "quatertricies": "qttc",
-        "quintricies": "qtc",
-        "sextricies": "sxtc",
-        "septtricies": "sptc",
-        "octotricies": "otc",
-        "novotricies": "ntc",
-        "quadragies": "qc",
-        "unquadragies": "uqc",
-        "duoquadragies": "dqc",
-        "terquadragies": "tqc",
-        "quaterquadragies": "qtqc",
-        "quinquadragies": "qqc",
-        "sexquadragies": "sxqc",
-        "septquadragies": "spqc",
-        "octoquadragies": "oqc",
-        "novoquadragies": "nqc",
-        "quinquagies": "pc",
-        "unquinquagies": "upc",
-        "duoquinquagies": "dpc",
-        "terquinquagies": "tpc",
-        "quaterquinquagies": "qtpc",
-        "quinquinquagies": "qpc",
-        "sexquinquagies": "sxpc",
-        "septquinquagies": "sppc",
-        "octoquinquagies": "opc",
-        "novoquinquagies": "npc",
-        "sexagies": "sc",
-        "unsexagies": "usc",
-        "duosexagies": "dsc",
-        "tersexagies": "tsc",
-        "quatersexagies": "qtsc",
-        "quinsexagies": "qsc",
-        "sexsexagies": "sxsc",
-        "septsexagies": "spsc",
-        "octosexagies": "osc",
-        "novosexagies": "nsc"
-    }
-
-    prefixe = {
-        "additionnel(s) après": "addap",
-        "additionnel(s) avant": "addav",
-        "motion": "mot",
-        "liminaire": "lim",
-        "unique": "unq",
-        "intitulé de la proposition de loi": "intPPL"
-    }
-
-    suffixe = {
-        "état": "E",
-        "annexe": "anx"
-    }
-
-    article = unicodedata.normalize("NFKC", article).lower()
-
-    digits = re.sub(
-        r"\D", "",
-        re.sub(r"\([^)]*\)", "", article)
-    )
-
-    texte = re.sub(
-        r"\([^()]*\)", "", article
-    ).strip()
-
-    pref = ""
-
-    for cle, code in prefixe.items():
-        if cle in article:
-            pref = code
-            break
-
-    mult = ""
-
-    for cle, code in multiplicatif.items():
-
-        m = re.search(
-            rf"(?<![a-zà-ÿ]){cle}(?![a-zà-ÿ])(?:\s+([a-z])(?![a-zà-ÿ]))?",
-            texte
-        )
-
-        if m:
-            mult = code + (
-                m.group(1).upper() if m.group(1) else ""
-            )
-            break
-
-    lettre = ""
-
-    if not mult:
-
-        m = re.search(
-            r"\d+(?:er)?\s+([a-z])(?![a-zà-ÿ0-9])",
-            texte
-        )
-
-        if m:
-            lettre = m.group(1).upper()
-
-    suf = ""
-
-    for cle, code in suffixe.items():
-
-        if cle in article:
-
-            if cle == "état":
-                suf = code + article[-1].upper()
-            else:
-                suf = code
-
-    id_article = pref + digits + mult + lettre + suf
-
-    return id_article
-
-
-def get_bloc_article(article: str):
-
-    article = unicodedata.normalize(
-        "NFKC", article
-    ).lower()
-
-    pref = "Article "
-
-    if "unique" in article:
-        digits = "unique"
-
-    elif "liminaire" in article:
-        digits = "liminaire"
-
-    elif "intitulé de la proposition de loi" in article:
-        pref = ""
-        digits = "Int. PPL"
-
-    elif "motions" in article:
-        pref = ""
-        digits = "Motions"
-
-    else:
-        digits = re.sub(
-            r"\D", "",
-            re.sub(r"\([^)]*\)", "", article)
-        )
-
-    return pref + digits
-
-
 def get_id_bloc_article(article: str):
 
     article = unicodedata.normalize(
@@ -389,13 +210,13 @@ def get_id_bloc_article(article: str):
     ).lower()
 
     if "unique" in article:
-        id_bloc = "unq"
+        id_bloc = "1"
 
     elif "liminaire" in article:
-        id_bloc = "lim"
+        id_bloc = "0"
 
     elif "motion" in article:
-        id_bloc = "mot"
+        id_bloc = "-1"
 
     elif "intitulé de la proposition de loi" in article:
         id_bloc = "intppl"
@@ -407,8 +228,7 @@ def get_id_bloc_article(article: str):
         )
 
     return id_bloc
-
-
+      
 ############### URL DES ARTICLES ###############
 
 def get_url_articles(url_disc: str):
@@ -670,3 +490,61 @@ def valeurs_identiques(a, b):
     if pd.isna(a) or pd.isna(b):
         return False
     return a == b
+
+
+MULTIPLICATIF_ARTICLE = {
+    "bis": "b", "ter": "t", "quater": "qt", "quinquies": "qq", "sexies": "sx",
+    # ... colle ici ton dict complet bis -> b, ter -> t, ... jusqu'à novosexagies
+}
+
+NATURE_ARTICLE = {
+    "motion": "mot",
+    "liminaire": "lim",
+    "unique": "unq",
+    "intitulé de la proposition de loi": "intPPL",
+}
+
+SUFFIXE_ARTICLE = {"état": "E", "annexe": "anx"}
+
+
+def get_id_article(article: str):
+
+    article = unicodedata.normalize("NFKC", article).lower()
+    sans_s = article.replace("(s)", "")
+    digits = re.sub(r"\D", "", re.sub(r"\([^)]*\)", "", article))
+    texte = " ".join(re.sub(r"\([^()]*\)", "", article).split())
+
+    pref = ""
+    if re.search(r"additionnel\s+apr[eè]s", sans_s):
+        pref = "addap"
+    elif re.search(r"additionnel\s+avant", sans_s):
+        pref = "addav"
+
+    nature = ""
+    for cle, code in NATURE_ARTICLE.items():
+        if re.search(rf"(?<![a-zà-ÿ]){cle}(?![a-zà-ÿ])", sans_s):
+            nature = code
+            break
+
+    mult = ""
+    for cle, code in MULTIPLICATIF_ARTICLE.items():
+        m = re.search(
+            rf"(?<![a-zà-ÿ]){cle}(?![a-zà-ÿ])(?:\s+([a-z])(?![a-zà-ÿ]))?",
+            texte
+        )
+        if m:
+            mult = code + (m.group(1).upper() if m.group(1) else "")
+            break
+
+    lettre = ""
+    if not mult:
+        m = re.search(r"\d+(?:er)?\s+([a-z])(?![a-zà-ÿ0-9])", texte)
+        if m:
+            lettre = m.group(1).upper()
+
+    suf = ""
+    for cle, code in SUFFIXE_ARTICLE.items():
+        if re.search(rf"(?<![a-zà-ÿ]){cle}(?![a-zà-ÿ])", texte):
+            suf = code + texte[-1].upper() if cle == "état" else code
+
+    return pref + nature + digits + mult + lettre + suf

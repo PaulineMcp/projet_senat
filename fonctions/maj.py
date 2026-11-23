@@ -96,6 +96,7 @@ for (
         updated_parties, updated_ordre, updated_content = fetch_content(
             id_disc
         )
+        print(updated_content[updated_content["id_amdt"].str.contains("I-217")][["id_amdt", "id_article", "id_partie"]])
 
         # Récupération des articles depuis le texte.
         print("# Récupération des articles")
@@ -121,6 +122,7 @@ for (
                     "id_partie",
                     conn=conn
                 )
+                
 
             ############### ACTUALISATION DES AMENDEMENTS ###############
 
@@ -165,6 +167,7 @@ for (
                     "id_amdt",
                     conn=conn
                 )
+            print(pd.read_sql("SELECT id_amdt, id_article, id_partie, is_active FROM amdts WHERE id_amdt LIKE '%I-217%'", conn))
 
             ############### ACTUALISATION DES ARTICLES ###############
 
