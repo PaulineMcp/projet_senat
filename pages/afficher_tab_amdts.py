@@ -49,6 +49,9 @@ st.markdown("""
 
 
 ############### FONCTIONS GENERALES ###############
+import streamlit.components.v1 as components
+
+
 def afficher_pagination(page_actuelle, nb_pages, page_key, search, position):
 
     with st.container(
