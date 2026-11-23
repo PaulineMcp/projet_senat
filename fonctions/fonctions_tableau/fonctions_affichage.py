@@ -20,20 +20,20 @@ def couleur_sort(val):
 def couleur_parti(val):
     if  "(GEST)" in str(val) :
         return "background-color: #079C63; color: #ffffff"
+    if "ouvernement" in str(val) :
+        return "background-color: #A09CD6; color: #ffffff"
+    else :
+        return ""
+
+def couleur_completion(val):
+    if  "compléter" in str(val) :
+        return "background-color: #FCFABB; color: #ffffff"
     # gérer l'affichage si c'est le gouvernement
     else :
         return ""
 
-#def get_row_height(df, colonnes_largeurs) :
-#    PX_PAR_CARACTERE = 7      # largeur moyenne d'un caractère
-#    PX_PAR_LIGNE = 22         # hauteur d'une ligne de texte
-#    PADDING_CELLULE = 5      # marge haut + bas dans la cellule
-#    HAUTEUR_MIN = 35
-#    nb_lignes_max = 1
-#    for colonne, largeur_px in colonnes_largeurs.items():
-#        caracteres_par_ligne = max(1, largeur_px // PX_PAR_CARACTERE)
-#        for texte in df[colonne].dropna().astype(str):
-#            nb_lignes = math.ceil(len(texte) / caracteres_par_ligne)
-#            nb_lignes_max = max(nb_lignes_max, nb_lignes)
-
-#    return max(HAUTEUR_MIN, nb_lignes_max * PX_PAR_LIGNE + PADDING_CELLULE)
+def couleur_ss_amdt(val):
+    if  "S/A" in str(val) :
+        return "background-color: #8F8F7B; color: #ffffff"
+    else :
+        return ""

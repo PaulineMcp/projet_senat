@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 #from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
-from fonctions.fonctions_tableau.fonctions_affichage import couleur_sort, couleur_parti
+from fonctions.fonctions_tableau.fonctions_affichage import couleur_sort, couleur_parti, couleur_completion, couleur_ss_amdt
 
 OPTIONS = [
     "🟢 Pour",
@@ -93,6 +93,8 @@ def appliquer_style(df):
             df.style
             .map(couleur_sort, subset=["sort"])
             .map(couleur_parti, subset=["nom_groupe"])
+            .map(couleur_completion, subset=["objet"])
+            .map(couleur_ss_amdt, subset=["amdt"])
         )
 
 def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd.DataFrame:
@@ -112,7 +114,7 @@ def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd
     hauteur_tab = 35 + len(df_by_article) * row_height + 3
     df_edite = editeur_stable(df_by_article,
                             base=f"{id_partie}_{article}",
-                            style_fn=None,
+                            style_fn= appliquer_style,
                             row_height=row_height,
                             column_order=["abrev_article", "lien_article", "amdt","lien_amdt","nom_groupe","objet", "com", "avis_com","avis_gouv","proposition_vote_amdt","sort"],
                             column_config={
