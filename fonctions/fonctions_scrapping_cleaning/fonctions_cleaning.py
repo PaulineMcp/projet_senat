@@ -550,3 +550,4 @@ def get_id_article(article: str):
     return pref + nature + digits + mult + lettre + suf
 
 print(get_id_article("Motion"))
+

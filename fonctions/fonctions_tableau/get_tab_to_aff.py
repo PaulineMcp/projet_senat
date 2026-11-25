@@ -6,6 +6,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 import math
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article
 
 # Chemin de la racine
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,68 +58,11 @@ def retrieve_tab(id_disc : str) :
                         """,
                         conn,
                         params = (id_disc,))
+    df["nom_groupe"] = (df["nom_groupe"].fillna(df["auteur"]))
+    df["bloc"] = pd.to_numeric(df["bloc"],errors="coerce").astype("Int64")  # ça il faut que ce soit géré en BDD
+    df = df.sort_values("bloc")
+    df["abrev_article"] = (df["article"].apply(abrev_article))
     return(df)
-
-def retrieve_first_tab(id_disc : str) :
-    with get_db() as conn :
-        df = pd.read_sql("""SELECT articles.id_bloc_article,
-                                articles.bloc,
-                                articles.id_article,
-                                articles.article,
-                                amdts.id_amdt,
-                                amdts.amdt,
-                                ordre_examen.ordre_examen_in_partie,
-                                amdts.sort,
-                                amdts.auteur,
-                                amdts.url_senateur,
-                                amdts.is_ss_amdt,
-                                amdts.lien_amdt,
-                                amdts.lien_article,
-                                senateurs.nom_groupe,
-                                avis.avis_com,
-                                avis.avis_gouv,
-                                remplissage_ap_amdt.objet,
-                                remplissage_ap_amdt.com,
-                               remplissage_ap_amdt.proposition_vote_amdt,
-                               amdts.is_active
-                            FROM articles
-                            LEFT JOIN amdts
-                                ON amdts.id_article = articles.id_article
-                            AND amdts.id_partie = ?
-                            LEFT JOIN ordre_examen
-                                ON ordre_examen.id_amdt = amdts.id_amdt
-                            LEFT JOIN avis
-                                ON avis.id_amdt = amdts.id_amdt
-                            LEFT JOIN senateurs
-                                ON senateurs.url = amdts.url_senateur
-                            LEFT JOIN remplissage_ap_amdt
-                                ON amdts.id_amdt = remplissage_ap_amdt.id_amdt
-                            LEFT JOIN parties
-                                ON amdts.id_partie = parties.id_partie
-                            WHERE articles.id_disc = ?
-                        """,
-                        conn,
-                        params=(f"{id_disc}-p1", id_disc))
-    return(df)
-
-
-#def retrieve_first_tab_test(id_disc : str) :
-#    with get_db() as conn :
-#        df = pd.read_sql("""SELECT articles.id_bloc_article,
-#                                articles.bloc,
-#                                articles.id_article,
-#                                articles.article,
-#                                ordre_examen.ordre_examen_in_partie
-#                            FROM articles
-#                            LEFT JOIN amdts
-#                            ON amdts.id_article = articles.id_article
-#                            LEFT JOIN ordre_examen
-#                           ON ordre_examen.id_amdt = amdts.id_amdt
-#                            WHERE id_disc = ?
-#                        """,
-#                        conn,
-#                        params=(id_disc,))
-#    return(df)
 
 def retrieve_infos_disc(id_disc : str):
     with get_db() as conn :

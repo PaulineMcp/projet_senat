@@ -149,17 +149,9 @@ def synchroniser_vote(id_article, key_source, toutes_les_cles):
             st.session_state[key] = nouvelle_valeur
 
 
-def display_vote(
-    est_additionnel: bool,
-    dict_votes_articles: dict,
-    id_article: str,
-    article: str,
-    votes: dict,
-    id_partie: str
-):
+def display_vote( est_additionnel: bool, dict_votes_articles: dict, id_article: str, article: str, votes: dict, id_partie: str):
 
     if not est_additionnel:
-
         id_article = str(id_article)
         id_partie = str(id_partie)
 

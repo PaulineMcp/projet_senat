@@ -26,9 +26,8 @@ def couleur_parti(val):
         return ""
 
 def couleur_completion(val):
-    if  "compléter" in str(val) :
+    if  "completer" in str(val) :
         return "background-color: #FCFABB; color: #ffffff"
-    # gérer l'affichage si c'est le gouvernement
     else :
         return ""
 

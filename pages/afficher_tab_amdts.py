@@ -7,25 +7,24 @@ import sqlite3
 import tempfile
 import os
 import math
+from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import Paragraph
+from fonctions.exports import exporter_bdd
 
 from pathlib import Path
 import pandas as pd
+from fonctions.exports import exporter_csv
+from pages.pdf_generation import df2table, generer_pdf, encadrer_vote, style_article, style_partie, style_vote, style_titre, generer_content
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from fonctions.fonctions_tableau.get_tab_to_aff import retrieve_tab, retrieve_infos_disc,retrieve_info_articles
 
-from fonctions.fonctions_tableau.display_tab import (
-    display_titre_resume_article,
-    display_vote,
-    display_tab
-)
-
-from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import (
-    abrev_article,
-    ffill_df
-)
+from fonctions.fonctions_tableau.display_tab import display_titre_resume_article, display_vote, display_tab
+from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article, ffill_df
 
 from fonctions.init_discussion import vide
 from utils import *
@@ -190,6 +189,7 @@ def numeroter_blocs_globaux(df: pd.DataFrame) -> pd.DataFrame:
         dfs,
         ignore_index=True
     )
+
 
 
 
@@ -424,9 +424,7 @@ st.markdown(
 ############### DISCUSSION SELECTIONNEE ###############
 
 
-search = st.query_params.get(
-    "discussion_choisie"
-)
+
 
 
 ############### AFFICHAGE DE LA PAGE ###############
@@ -434,6 +432,8 @@ search = st.query_params.get(
 
 @st.fragment(run_every="1800s")
 def afficher_page(search):
+
+    content_pdf = []
 
     # --------------------------------------------------
     # 1. RECUPERATION DES DONNEES
@@ -443,16 +443,12 @@ def afficher_page(search):
     df_all_partie["nom_groupe"] = (df_all_partie["nom_groupe"].fillna(df_all_partie["auteur"]))
 
     if df_all_partie.empty:
-        st.warning(
-            "Aucune donnée disponible pour cette discussion."
-        )
+        st.warning("Aucune donnée disponible pour cette discussion.")
         return
 
-    df_all_partie = df_all_partie.copy()
+    df_all_partie = df_all_partie.copy()    ### à suprr
 
-    df_all_partie["abrev_article"] = (
-        df_all_partie["article"].apply(abrev_article)
-    )
+    df_all_partie["abrev_article"] = (df_all_partie["article"].apply(abrev_article))
 
     # Numérotation de TOUS les blocs, sans filtrage des amendements.
     df_all_partie["bloc"] = pd.to_numeric(df_all_partie["bloc"],errors="coerce").astype("Int64")
@@ -477,14 +473,10 @@ def afficher_page(search):
     df_infos_disc = retrieve_infos_disc(search)
 
     if df_infos_disc.empty:
-        st.error(
-            "Impossible de récupérer les informations de la discussion."
-        )
+        st.error("Impossible de récupérer les informations de la discussion.")
         return
 
-    titre_discussion = (
-        df_infos_disc["titre_disc_long"].iloc[0]
-    )
+    titre_discussion = (df_infos_disc["titre_disc_long"].iloc[0])
 
     lien_dossier_discussion = (
         df_infos_disc["lien_dossier"].iloc[0]
@@ -537,57 +529,28 @@ def afficher_page(search):
     resumes = st.session_state["pending_resumes"]
     votes = st.session_state["pending_votes"]
 
-    # --------------------------------------------------
-    # 4. TITRE
-    # --------------------------------------------------
+    # Titre
 
     with st.container():
+        st.markdown(f"""<h1 style='text-align:center;'>Amendements liés au {titre_discussion}</h1>""",unsafe_allow_html=True)
 
-        st.markdown(
-            f"""
-            <h1 style='text-align:center;'>
-                Amendements liés au {titre_discussion}
-            </h1>
-            """,
-            unsafe_allow_html=True
-        )
-
-    # --------------------------------------------------
-    # 5. BOUTONS ET LIENS
-    # --------------------------------------------------
+    # Boutons
 
     col_vide, col_buttons = st.columns([4, 1])
 
     with col_buttons:
 
         if lien_note_discussion:
-            st.link_button(
-                "Lien vers la note du groupe",
-                lien_note_discussion
-            )
-
+            st.link_button("Lien vers la note du groupe",lien_note_discussion)
         if lien_dossier_discussion:
-            st.link_button(
-                "Lien vers le dossier législatif",
-                lien_dossier_discussion
-            )
-
-        if st.button(
-            "Lien vers la version «sans édition possible»",
-            width="stretch"
-        ):
-
+            st.link_button("Lien vers le dossier législatif",lien_dossier_discussion)
+        if st.button("Lien vers la version «sans édition possible»",width="stretch"):
             st.query_params["discussion_choisie"] = search
-
-            st.switch_page(
-                "pages/vue_seule_tab_amdts.py"
-            )
+            st.switch_page("pages/vue_seule_tab_amdts.py")
 
     st.space("medium")
 
-    # --------------------------------------------------
-    # 6. PAGINATION
-    # --------------------------------------------------
+    # Pagination
 
     max_bloc = df_all_partie["bloc"].max()
 
@@ -604,12 +567,7 @@ def afficher_page(search):
     borne_max = borne_min + 4
 
     # Boutons de pagination.
-    with st.container(
-        horizontal=True,
-        horizontal_alignment="center",
-        vertical_alignment="center"
-    ):
-
+    with st.container(horizontal=True,horizontal_alignment="center",vertical_alignment="center"):
         afficher_pagination(page_actuelle, nb_pages, page_key, search, "haut")
 
     # --------------------------------------------------
@@ -628,47 +586,44 @@ def afficher_page(search):
         df_page = df_partie[df_partie["bloc"].between(borne_min, borne_max)]
 
         st.header(titre_partie)
+        #content_pdf.append(Paragraph(str(titre_partie), style_partie))
 
-        articles = (
-            df_page[["bloc", "id_article", "article"]]
-            .drop_duplicates(subset=["bloc", "id_article", "article"])
-            .sort_values(["bloc", "id_article"])
-        )
-
+        articles = (df_page[["bloc", "id_article", "article"]].drop_duplicates(subset=["bloc", "id_article", "article"]).sort_values(["bloc", "id_article"]))
         for bloc, id_article, article in articles.itertuples(index=False, name=None):
 
-            df_by_article = df_page[
-                (df_page["bloc"] == bloc)
-                & (df_page["id_article"] == id_article)
-            ]
+            df_by_article = df_page[(df_page["bloc"] == bloc)& (df_page["id_article"] == id_article)]
 
-            df_amdt_actifs = df_by_article[
-                df_by_article["amdt"].notna()
-                & (pd.to_numeric(df_by_article["is_active"], errors="coerce") == 1)
-            ].sort_values("ordre_examen_in_partie")
+            df_amdt_actifs = df_by_article[df_by_article["amdt"].notna()& (pd.to_numeric(df_by_article["is_active"], errors="coerce") == 1)].sort_values("ordre_examen_in_partie")
 
-            display_titre_resume_article(
-                id_article, article, id_partie, dict_resumes, resumes
-            )
+            display_titre_resume_article(id_article, article, id_partie, dict_resumes, resumes)
+            #content_pdf.append(Spacer(1, 12))
+            #content_pdf.append(Paragraph(str(article), style_article))
+            # Ajouter le résumé
+            #content_pdf.append(Spacer(1, 6))
 
             est_article_add = "add" in str(article).lower()
 
-            if df_amdt_actifs.empty:
+            if df_amdt_actifs.empty: # si aucun amendements actifs
                 st.write("Pas d'amendement")
+                #content_pdf.append(Paragraph("Pas d'amendement"))
+                
                 if not est_article_add:
                     
-                    display_vote(
-                        False, dict_votes_articles, id_article, article, votes, id_partie
-                    )
+                    display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
+                    content_pdf.append(encadrer_vote(f"Vote sur {article} : {dict_votes_articles.get(id_article)}"))
+                    content_pdf.append(Spacer(1, 6))
 
             else:
 
                 display_tab(df_amdt_actifs, article, id_partie)
+                #df_for_pdf = df_amdt_actifs[["abrev_article","amdt","nom_groupe","objet","com","avis_com","avis_gouv","proposition_vote_amdt","sort"]]
+                #df_for_pdf = df_for_pdf.rename(columns={"abrev_article": "Article", "amdt": "Amdt","nom_groupe" : "Auteur.rice", "objet" : "Objet", "com" : "Commentaire", "avis_com" : "Avis com", "avis_gouv" : "Avis gouv", "proposition_vote_amdt" : "Proposition vote", "sort" : "Sort"})
+                #content_pdf.append(df2table(df_for_pdf))
 
                 if not est_article_add:
-                    display_vote(
-                        False, dict_votes_articles, id_article, article, votes, id_partie
-                    )
+                    display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
+                    content_pdf.append(encadrer_vote(f"Vote sur {article} : {dict_votes_articles.get(id_article)}"))
+                    content_pdf.append(Spacer(1, 6))
 
             # Espacement systématique, y compris pour les articles add sans amendement
             st.space("xlarge")
@@ -692,140 +647,100 @@ def afficher_page(search):
                     "Modifications enregistrées avec succès !"
                 )
 
+        st.download_button(
+            "Télécharger une copie de la base en .DB",
+            data=exporter_bdd(),
+            file_name="ma_base_backup.db",
+            mime="application/octet-stream")
+
+        #st.download_button(
+        #    label="Télécharger en CSV",
+        #    data= exporter_csv(search),
+        #    file_name="tableau.csv",
+        #    mime="text/csv",
+        #    icon=":material/download:"
+        #)
+
+        if "afficher_export_pdf" not in st.session_state:
+            st.session_state.afficher_export_pdf = False
+
+        if "afficher_articles_export_pdf" not in st.session_state:
+            st.session_state.afficher_articles_export_pdf = False
+
+        if "partie_selectionnee" not in st.session_state:
+            st.session_state.partie_selectionnee = None
+
+        if "articles_selectionnes" not in st.session_state:
+            st.session_state.articles_selectionnes = []
+
+
+        if st.button("Télécharger en pdf") : 
+            st.session_state.afficher_export_pdf = True
+
+        if st.session_state.afficher_export_pdf: 
+
+            parties = (df_all_partie[["id_partie","titre_partie"]].dropna().drop_duplicates(subset=["id_partie","titre_partie"]))
+            print(parties)
+            articles = (df_all_partie[["id_article","article"]].drop_duplicates(subset=["id_article","article"])) 
+            id_article_list = articles["id_article"].to_list()      
+
+            with st.container(horizontal=True):
+
+                content = generer_pdf(generer_content(search,id_article_list))
+                st.download_button("Télécharger tous les articles",
+                                        content,
+                                        file_name="tableau.pdf", 
+                                        mime="application/pdf",
+                                        icon=":material/download:")
+
+                if st.button("Sélectionner les parties à exporter"):
+                    st.session_state.afficher_articles_export_pdf = True
+
+            if st.session_state.afficher_articles_export_pdf :
+                with st.container(horizontal = True) :
+                    for id_partie,titre_partie in parties.itertuples(index = None, name = None) :
+                        if st.button(titre_partie) :
+                             st.session_state.partie_selectionnee = id_partie
+
+            if st.session_state.partie_selectionnee is not None:
+                with st.container(horizontal=True):
+                    for id_article, article in articles.itertuples(index = None, name = None) :
+                            if st.checkbox(article, key={id_article}) :
+                                st.session_state.articles_selectionnes.append(id_article)
+
+                    st.download_button(
+                        label="Télécharger la sélection",
+                        data= generer_pdf(generer_content(search,st.session_state.articles_selectionnes)),
+                        file_name="tableau.pdf",
+                        mime="application/pdf",
+                        icon=":material/download:"
+                    )
+                            
+                
+                        #articles_selectionnes = [for k, v in st.session_state.items() if k.startswith("article_") and v]        
+                        
+                    #content = generer_pdf(generer_content(search,"2026-2027-SCE-155-2","2026-2027-SCE-155-41"))
+
+                #st.download_button(
+                #    label="Télécharger la sélection",
+                #    data= generer_pdf(generer_content(search,["2026-2027-SCE-155-2","2026-2027-SCE-155-41"])),
+                #    file_name="tableau.pdf",
+                #    mime="application/pdf",
+                #    icon=":material/download:"
+                #)
+
+            
+
+
 
 ############### LANCEMENT DE LA PAGE ###############
 
-
+search = st.query_params.get("discussion_choisie")
 if search:
-
     afficher_page(search)
-
     st.divider()
 
 else:
-
-    st.error(
-        "Aucune discussion sélectionnée."
-    )
+    st.error("Aucune discussion sélectionnée.")
 
 
-############### EXPORT DE LA BASE DE DONNEES ###############
-
-
-def exporter_bdd() -> bytes:
-
-    with tempfile.TemporaryDirectory() as dossier:
-
-        chemin = os.path.join(
-            dossier,
-            "backup.db"
-        )
-
-        with get_db() as src:
-
-            dst = sqlite3.connect(chemin)
-
-            try:
-                src.backup(dst)
-            finally:
-                dst.close()
-
-        with open(chemin, "rb") as fichier:
-            return fichier.read()
-
-
-st.download_button(
-    "Télécharger une copie de la base en .DB",
-    data=exporter_bdd(),
-    file_name="ma_base_backup.db",
-    mime="application/octet-stream"
-)
-
-
-
-############### EXPORT CSV ###############
-
-
-def convert_for_download(df):
-
-    return df.to_csv(
-        index=False
-    ).encode("utf-8-sig")
-
-
-if search:
-
-    df_for_download = retrieve_tab(search)
-
-    if not df_for_download.empty:
-
-        df_for_download = df_for_download.copy()
-
-        df_for_download["abrev_article"] = (
-            df_for_download["article"].apply(abrev_article)
-        )
-
-        df_for_download["bloc"] = pd.to_numeric(
-            df_for_download["bloc"],
-            errors="coerce"
-        ).astype("Int64")
-
-        df_for_download = df_for_download.sort_values(
-            [
-                "id_partie",
-                "bloc",
-                "ordre_examen_in_partie"
-            ],
-            na_position="last"
-        )
-
-        df_for_download = ffill_df(
-            df_for_download
-        )
-
-        df_for_download["nom_groupe"] = (
-            df_for_download["nom_groupe"].fillna(
-                df_for_download["auteur"]
-            )
-        )
-
-        # Filtrage des amendements actifs uniquement pour l'export.
-        df_for_download = df_for_download[
-            df_for_download["id_amdt"].notna()
-            & (
-                pd.to_numeric(
-                    df_for_download["is_active"],
-                    errors="coerce"
-                ) == 1
-            )
-        ].copy()
-
-        colonnes_csv = [
-            "abrev_article",
-            "amdt",
-            "nom_groupe",
-            "lien_amdt",
-            "lien_article",
-            "objet",
-            "com",
-            "avis_com",
-            "avis_gouv",
-            "proposition_vote_amdt",
-            "sort"
-        ]
-
-        df_for_download = df_for_download[
-            colonnes_csv
-        ]
-
-        csv = convert_for_download(
-            df_for_download
-        )
-
-        st.download_button(
-            label="Télécharger en CSV",
-            data=csv,
-            file_name="tableau.csv",
-            mime="text/csv",
-            icon=":material/download:"
-        )
