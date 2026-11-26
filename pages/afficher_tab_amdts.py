@@ -12,6 +12,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import Paragraph
 from fonctions.exports import exporter_bdd
+import re
 
 from pathlib import Path
 import pandas as pd
@@ -21,7 +22,7 @@ from pages.pdf_generation import df2table, generer_pdf, encadrer_vote, style_art
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from fonctions.fonctions_tableau.get_tab_to_aff import retrieve_tab, retrieve_infos_disc,retrieve_info_articles
+from fonctions.fonctions_tableau.get_tab_to_aff import retrieve_infos_disc,retrieve_info_articles, retrieve_1_partie, retrieve_tab_autres_parties, retrieve_tab
 
 from fonctions.fonctions_tableau.display_tab import display_titre_resume_article, display_vote, display_tab
 from fonctions.fonctions_scrapping_cleaning.fonctions_cleaning import abrev_article, ffill_df
@@ -98,99 +99,90 @@ def get_nb_pages(nb_bloc: int) -> int:
 
 def get_borne_min(page: int) -> int:
     """Retourne le premier numéro de bloc global de la page."""
+    borne_min = ((page - 1) * 5) + 1
+    if borne_min == 1:
+        borne_min = -1
+    return borne_min
 
-    return ((page - 1) * 5) + 1
+def get_borne_max(borne_min : int) -> int :
+    if borne_min == -1:
+        borne_max = 5
+    else :
+        borne_max = borne_min + 4
+    return(borne_max)
 
+def propager_ordre_examen(df) -> int :
+    """Fonction pour trouver l'emplacement des articles sans amendements"""
+    for index, row in df.iterrows():
+        print(f"ARTICLE REGARDE : {df.loc[index, "article"]}")
+        #if (df.loc[index, "ordre_examen_in_partie"] is None and df.loc[index, "ordre_partie"] is None) :
+        if (
+            pd.isna(df.loc[index, "ordre_examen_in_partie"])
+            and pd.isna(df.loc[index, "ordre_partie"])
+        ):
+            #df.loc[index, "ordre_examen_in_partie"] = 999999
+            df.loc[index, "ordre_partie"] = 1
+            row["ordre_partie"] = 1
 
+            id_disc = df.loc[index, "id_disc"]
+            article = df.loc[index,"article"]
 
-def numeroter_blocs_globaux(df: pd.DataFrame) -> pd.DataFrame:
+            num_article = article.replace(f"{id_disc}-", "")
+            match = re.search(r"\d+", num_article)
 
-    df["bloc"] = pd.to_numeric(df["bloc"],errors="coerce").astype("Int64")
-    df["ordre_examen_in_partie"] = pd.to_numeric(df["ordre_examen_in_partie"], errors="coerce"
-    )
+            if not match: # cas des articles uniques, liminaires (pas des chiffres)
+                continue
 
+            chiffre_article = int(match.group())
+            chiffre_prev_article = chiffre_article - 1
 
-    # Conserver l'ordre d'apparition des parties.
-    parties = (
-        df["id_partie"]
-        .dropna()
-        .drop_duplicates()
-        .tolist()
-    )
+            if chiffre_article == 1 :
+                df.loc[index, "ordre_examen_in_partie"] = 9 # uniquement valable pour plf 2027
 
-    dernier_bloc_global = 0
-    dfs = []
+            else : 
+                if "addav" in num_article :
+                    print("XXX")
+                #    if f"{id_disc}-addap{chiffre_prev_article}" in df["article"] :
+                #        filtered_df = df[df["article"] == f"{id_disc}-addap{chiffre_prev_article}"] & df[["is_active"] == 1] # que pour les is active
+                #        row["ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
+                elif "addap" in num_article :
+                    print("XXX")
+                #        filtered_df = df[df["article"] == f"{id_disc}-{chiffre_prev_article}"] & df[["is_active"] == 1]
+                #        row["ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
+                else:  # article principal
+                    if f"{id_disc}-addap{chiffre_prev_article}" in df["id_article"].values:
+                        filtered_df = df[
+                            (df["id_article"] == f"{id_disc}-addap{chiffre_prev_article}")
+                            & (df["is_active"] == 1)
+                            & (df["ordre_examen_in_partie"].notna())
+                        ]
+                    else:
+                        print("cas B")
+                        print(f"Article précédent = {id_disc}-{chiffre_prev_article}")
 
-    for id_partie in parties:
+                        filtered_df = pd.DataFrame()
 
-        df_partie = df[
-            df["id_partie"] == id_partie
-        ].copy()
+                        while chiffre_prev_article >= 1:
+                            filtered_df = df[
+                                (df["id_article"] == f"{id_disc}-{chiffre_prev_article}")
+                                & (df["is_active"].isin([1, None]) | df["is_active"].isna())
+                                & (df["ordre_examen_in_partie"].notna())
+                            ]
 
-        # Déterminer le premier ordre d'examen de chaque bloc.
-        ordre_blocs = (
-            df_partie[df_partie["bloc"].notna()]
-            .groupby("bloc", as_index=False)
-            ["ordre_examen_in_partie"]
-            .min()
-            .sort_values(
-                ["ordre_examen_in_partie", "bloc"],
-                na_position="last"
-            )
-        )
+                            print(filtered_df)
 
-        blocs_a_conserver = ordre_blocs["bloc"].tolist()
+                            if not filtered_df.empty:
+                                break
 
-        # Numérotation continue entre les parties.
-        correspondance = {
-            bloc: dernier_bloc_global + numero
-            for numero, bloc in enumerate(
-                blocs_a_conserver,
-                start=1
-            )
-        }
+                            chiffre_prev_article -= 1
 
-        df_partie["bloc_global"] = (
-            df_partie["bloc"]
-            .map(correspondance)
-            .astype("Int64")
-        )
-
-        if correspondance:
-            dernier_bloc_global = max(
-                correspondance.values()
-            )
-
-        dfs.append(df_partie)
-
-    # Conserver également les lignes sans partie.
-    df_sans_partie = df[
-        df["id_partie"].isna()
-    ].copy()
-
-    df_sans_partie["bloc_global"] = pd.Series(
-        pd.NA,
-        index=df_sans_partie.index,
-        dtype="Int64"
-    )
-
-    if not df_sans_partie.empty:
-        dfs.append(df_sans_partie)
-
-    if not dfs:
-        df["bloc_global"] = pd.Series(
-            pd.NA,
-            index=df.index,
-            dtype="Int64"
-        )
-        return df
-
-    return pd.concat(
-        dfs,
-        ignore_index=True
-    )
-
-
+                    if not filtered_df.empty:
+                        df.loc[index, "ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
+                    else:
+                        print("Aucun article précédent avec un ordre d'examen trouvé")
+        else :
+            print("Contient bien un ordre et tout ce qu'il faut")
+    return(df)
 
 
 
@@ -209,20 +201,9 @@ def sauvegarder_modifications() -> bool:
         - pending_resumes
     """
 
-    pending_amdt = st.session_state.get(
-        "pending_amdt",
-        {}
-    )
-
-    pending_votes = st.session_state.get(
-        "pending_votes",
-        {}
-    )
-
-    pending_resumes = st.session_state.get(
-        "pending_resumes",
-        {}
-    )
+    pending_amdt = st.session_state.get("pending_amdt",{})
+    pending_votes = st.session_state.get("pending_votes",{})
+    pending_resumes = st.session_state.get("pending_resumes",{})
 
     conn = None
 
@@ -433,38 +414,37 @@ st.markdown(
 @st.fragment(run_every="1800s")
 def afficher_page(search):
 
-    content_pdf = []
+    titre_partie = ""
+    id_partie = "2026-2027-SCE-155-p1"
 
     # --------------------------------------------------
     # 1. RECUPERATION DES DONNEES
     # --------------------------------------------------
 
+    # Ce nettoyage devrait être dégé dans la requete
     df_all_partie = retrieve_tab(search)
-    df_all_partie["nom_groupe"] = (df_all_partie["nom_groupe"].fillna(df_all_partie["auteur"]))
 
     if df_all_partie.empty:
         st.warning("Aucune donnée disponible pour cette discussion.")
         return
+    
+    # + ajouter le "première partie en string" + id_partie
 
-    df_all_partie = df_all_partie.copy()    ### à suprr
+    #df_all_partie["ordre_partie"] = df_all_partie["ordre_partie"].fillna(value=1)
+    df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
+     # les articles sans amendements sont attribués à la premières partie par défaut
+    
+    df_all_partie = propager_ordre_examen(df_all_partie)
 
-    df_all_partie["abrev_article"] = (df_all_partie["article"].apply(abrev_article))
-
-    # Numérotation de TOUS les blocs, sans filtrage des amendements.
-    df_all_partie["bloc"] = pd.to_numeric(df_all_partie["bloc"],errors="coerce").astype("Int64")
-    df_all_partie = df_all_partie.sort_values("bloc")
-
-    # Liste des parties dans leur ordre d'apparition.
-    parties = (
-        df_all_partie[
-            ["id_partie", "titre_partie"]
-        ]
-        .dropna(subset=["id_partie"])
-        .drop_duplicates(
-            subset=["id_partie"],
-            keep="first"
-        )
-    )
+#    df_all_partie["ordre_examen_in_partie"] = df_all_partie["ordre_examen_in_partie"].ffill()
+    df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
+    df_all_partie = df_all_partie[(df_all_partie["is_active"] == 1)|(df_all_partie["id_amdt"].isna())]
+    df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
+    # Ecriture des blocs globaux
+    bloc_globaux = df_all_partie[["id_article","ordre_partie"]].drop_duplicates().reset_index(drop=True)
+    bloc_globaux["bloc_global"] = range(-1,len(bloc_globaux)-1)
+    df_all_partie = df_all_partie.merge(bloc_globaux, on = ["id_article","ordre_partie"]) 
+    df_all_partie["nom_groupe"] = (df_all_partie["nom_groupe"].fillna(df_all_partie["auteur"])) # faudrait que ce soit géré dans la requête
 
     # --------------------------------------------------
     # 2. INFORMATIONS DE LA DISCUSSION
@@ -477,14 +457,8 @@ def afficher_page(search):
         return
 
     titre_discussion = (df_infos_disc["titre_disc_long"].iloc[0])
-
-    lien_dossier_discussion = (
-        df_infos_disc["lien_dossier"].iloc[0]
-    )
-
-    lien_note_discussion = (
-        df_infos_disc["lien_note"].iloc[0]
-    )
+    lien_dossier_discussion = (df_infos_disc["lien_dossier"].iloc[0])
+    lien_note_discussion = (df_infos_disc["lien_note"].iloc[0])
 
     # --------------------------------------------------
     # 3. INFORMATIONS DES VOTES ET RESUMES
@@ -497,45 +471,27 @@ def afficher_page(search):
         dict_resumes = {}
     else:
         dict_votes_articles = dict(
-            zip(
-                df_votes_articles["id_article"].astype(str),
-                df_votes_articles["proposition_vote_article"]
-            )
-        )
+            zip(df_votes_articles["id_article"].astype(str),
+                df_votes_articles["proposition_vote_article"]))
 
-        dict_resumes = dict(
-            zip(
-                df_votes_articles["id_article"].astype(str),
-                df_votes_articles["resume_article"]
-            )
-        )
+        dict_resumes = dict(zip(df_votes_articles["id_article"].astype(str),
+                                df_votes_articles["resume_article"]))
 
     # Dictionnaires de modifications en attente.
-    st.session_state.setdefault(
-        "pending_resumes",
-        {}
-    )
+    st.session_state.setdefault("pending_resumes",{})
 
-    st.session_state.setdefault(
-        "pending_votes",
-        {}
-    )
+    st.session_state.setdefault("pending_votes",{})
 
-    st.session_state.setdefault(
-        "pending_amdt",
-        {}
-    )
+    st.session_state.setdefault("pending_amdt",{})
 
     resumes = st.session_state["pending_resumes"]
     votes = st.session_state["pending_votes"]
 
     # Titre
-
     with st.container():
         st.markdown(f"""<h1 style='text-align:center;'>Amendements liés au {titre_discussion}</h1>""",unsafe_allow_html=True)
 
     # Boutons
-
     col_vide, col_buttons = st.columns([4, 1])
 
     with col_buttons:
@@ -552,7 +508,7 @@ def afficher_page(search):
 
     # Pagination
 
-    max_bloc = df_all_partie["bloc"].max()
+    max_bloc = df_all_partie["bloc_global"].max()
 
     nb_pages = get_nb_pages(int(max_bloc))
     page_key = f"page_actuelle_{search}"
@@ -564,7 +520,7 @@ def afficher_page(search):
     page_actuelle = st.session_state[page_key]
 
     borne_min = get_borne_min(page_actuelle)
-    borne_max = borne_min + 4
+    borne_max = get_borne_max(borne_min)
 
     # Boutons de pagination.
     with st.container(horizontal=True,horizontal_alignment="center",vertical_alignment="center"):
@@ -574,173 +530,157 @@ def afficher_page(search):
     # 7. AFFICHAGE DES PARTIES ET DES ARTICLES
     # --------------------------------------------------
 
-    for id_partie, titre_partie in parties.itertuples(index=False, name=None):
+    st.write(borne_min)
+    st.write(borne_max)
+        
+    df_page = df_all_partie[df_all_partie["bloc_global"].between(borne_min, borne_max)]
+    
+    st.header(titre_partie)
 
-        df_all_partie["id_partie"] = df_all_partie["id_partie"].ffill()
-        df_partie = df_all_partie[df_all_partie["id_partie"] == id_partie]
-        df_partie = df_partie.sort_values(["bloc", "ordre_examen_in_partie"])
+    articles = (df_page[["bloc", "id_article", "article"]].drop_duplicates(subset=["bloc", "id_article", "article"]))
+    for bloc, id_article, article in articles.itertuples(index=False, name=None):
 
-        if borne_min == 1:
-            borne_min = -1
+        df_by_article = df_page[(df_page["bloc"] == bloc)& (df_page["id_article"] == id_article)]
+        df_amdt_actifs = df_by_article[df_by_article["amdt"].notna()& (pd.to_numeric(df_by_article["is_active"], errors="coerce") == 1)].sort_values("ordre_examen_in_partie")
 
-        df_page = df_partie[df_partie["bloc"].between(borne_min, borne_max)]
+        if df_amdt_actifs.empty :
+            print("")
+        else : 
+            # Afficher le titre de la partie si c'est une nouvelle partie
+            new_titre_partie = df_amdt_actifs["titre_partie"].iloc[0]
+            id_partie = df_amdt_actifs["id_partie"].unique()[0]
+            if new_titre_partie == titre_partie :
+                print("")
+            else : 
+                titre_partie = new_titre_partie
+                st.header(titre_partie)
 
-        st.header(titre_partie)
-        #content_pdf.append(Paragraph(str(titre_partie), style_partie))
+        # Afficher titre de l'article et son résumé (et si besoin le vote)
+        display_titre_resume_article(id_article, article, id_partie, dict_resumes, resumes)
 
-        articles = (df_page[["bloc", "id_article", "article"]].drop_duplicates(subset=["bloc", "id_article", "article"]).sort_values(["bloc", "id_article"]))
-        for bloc, id_article, article in articles.itertuples(index=False, name=None):
+        est_article_add = "add" in str(article).lower()
 
-            df_by_article = df_page[(df_page["bloc"] == bloc)& (df_page["id_article"] == id_article)]
-
-            df_amdt_actifs = df_by_article[df_by_article["amdt"].notna()& (pd.to_numeric(df_by_article["is_active"], errors="coerce") == 1)].sort_values("ordre_examen_in_partie")
-
-            display_titre_resume_article(id_article, article, id_partie, dict_resumes, resumes)
-            #content_pdf.append(Spacer(1, 12))
-            #content_pdf.append(Paragraph(str(article), style_article))
-            # Ajouter le résumé
-            #content_pdf.append(Spacer(1, 6))
-
-            est_article_add = "add" in str(article).lower()
-
-            if df_amdt_actifs.empty: # si aucun amendements actifs
-                st.write("Pas d'amendement")
-                #content_pdf.append(Paragraph("Pas d'amendement"))
-                
-                if not est_article_add:
-                    
-                    display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
-                    content_pdf.append(encadrer_vote(f"Vote sur {article} : {dict_votes_articles.get(id_article)}"))
-                    content_pdf.append(Spacer(1, 6))
-
-            else:
-
-                display_tab(df_amdt_actifs, article, id_partie)
-                #df_for_pdf = df_amdt_actifs[["abrev_article","amdt","nom_groupe","objet","com","avis_com","avis_gouv","proposition_vote_amdt","sort"]]
-                #df_for_pdf = df_for_pdf.rename(columns={"abrev_article": "Article", "amdt": "Amdt","nom_groupe" : "Auteur.rice", "objet" : "Objet", "com" : "Commentaire", "avis_com" : "Avis com", "avis_gouv" : "Avis gouv", "proposition_vote_amdt" : "Proposition vote", "sort" : "Sort"})
-                #content_pdf.append(df2table(df_for_pdf))
-
-                if not est_article_add:
-                    display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
-                    content_pdf.append(encadrer_vote(f"Vote sur {article} : {dict_votes_articles.get(id_article)}"))
-                    content_pdf.append(Spacer(1, 6))
-
-            # Espacement systématique, y compris pour les articles add sans amendement
-            st.space("xlarge")
-
-        afficher_pagination(page_actuelle, nb_pages, page_key, search, "bas")        
-
-
-    # --------------------------------------------------
-    # 8. SAUVEGARDE
-    # --------------------------------------------------
-
-        if st.button(
-            "Sauvegarder les modifications",
-            type="primary"
-        ):
-
-            succes = sauvegarder_modifications()
-
-            if succes:
-                st.success(
-                    "Modifications enregistrées avec succès !"
-                )
-
-        st.download_button(
-            "Télécharger une copie de la base en .DB",
-            data=exporter_bdd(),
-            file_name="ma_base_backup.db",
-            mime="application/octet-stream")
-
-        #st.download_button(
-        #    label="Télécharger en CSV",
-        #    data= exporter_csv(search),
-        #    file_name="tableau.csv",
-        #    mime="text/csv",
-        #    icon=":material/download:"
-        #)
-
-        if "afficher_export_pdf" not in st.session_state:
-            st.session_state.afficher_export_pdf = False
-
-        if "afficher_articles_export_pdf" not in st.session_state:
-            st.session_state.afficher_articles_export_pdf = False
-
-        if "partie_selectionnee" not in st.session_state:
-            st.session_state.partie_selectionnee = None
-
-        if "articles_selectionnes" not in st.session_state:
-            st.session_state.articles_selectionnes = []
-
-
-        if st.button("Télécharger en pdf") : 
-            st.session_state.afficher_export_pdf = True
-
-        if st.session_state.afficher_export_pdf: 
-
-            parties = (df_all_partie[["id_partie","titre_partie"]].dropna().drop_duplicates(subset=["id_partie","titre_partie"]))
-            print(parties)
-            articles = (df_all_partie[["id_article","article"]].drop_duplicates(subset=["id_article","article"])) 
-            id_article_list = articles["id_article"].to_list()      
-
-            with st.container(horizontal=True):
-
-                content = generer_pdf(generer_content(search,id_article_list))
-                st.download_button("Télécharger tous les articles",
-                                        content,
-                                        file_name="tableau.pdf", 
-                                        mime="application/pdf",
-                                        icon=":material/download:")
-
-                if st.button("Sélectionner les parties à exporter"):
-                    st.session_state.afficher_articles_export_pdf = True
-
-            if st.session_state.afficher_articles_export_pdf :
-                with st.container(horizontal = True) :
-                    for id_partie,titre_partie in parties.itertuples(index = None, name = None) :
-                        if st.button(titre_partie) :
-                             st.session_state.partie_selectionnee = id_partie
-
-            if st.session_state.partie_selectionnee is not None:
-                with st.container(horizontal=True):
-                    for id_article, article in articles.itertuples(index = None, name = None) :
-                            if st.checkbox(article, key={id_article}) :
-                                st.session_state.articles_selectionnes.append(id_article)
-
-                    st.download_button(
-                        label="Télécharger la sélection",
-                        data= generer_pdf(generer_content(search,st.session_state.articles_selectionnes)),
-                        file_name="tableau.pdf",
-                        mime="application/pdf",
-                        icon=":material/download:"
-                    )
-                            
-                
-                        #articles_selectionnes = [for k, v in st.session_state.items() if k.startswith("article_") and v]        
-                        
-                    #content = generer_pdf(generer_content(search,"2026-2027-SCE-155-2","2026-2027-SCE-155-41"))
-
-                #st.download_button(
-                #    label="Télécharger la sélection",
-                #    data= generer_pdf(generer_content(search,["2026-2027-SCE-155-2","2026-2027-SCE-155-41"])),
-                #    file_name="tableau.pdf",
-                #    mime="application/pdf",
-                #    icon=":material/download:"
-                #)
-
+        if df_amdt_actifs.empty: # si aucun amendements actifs
+            st.write("Pas d'amendement")
             
+            if not est_article_add:
+                
+                display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
+
+        else:
+
+            display_tab(df_amdt_actifs, article, id_partie)
+
+            if not est_article_add:
+                display_vote(False, dict_votes_articles, id_article, article, votes, id_partie)
+
+        st.space("xlarge")
+
+    afficher_pagination(page_actuelle, nb_pages, page_key, search, "bas")        
+
+        ##
+    ### Bouton de sauvegarde ###
+
+    if st.button("Sauvegarder les modifications",type="primary"):
+        succes = sauvegarder_modifications()
+        if succes:
+            st.success("Modifications enregistrées avec succès !")
+
+def afficher_boutons_download(search : str):
+
+    df_all_partie = retrieve_tab(search)
+
+    ### afficher les boutons d'export
+
+    st.download_button(
+        "Télécharger une copie de la base en .DB",
+        data=exporter_bdd(),
+        file_name="ma_base_backup.db",
+        mime="application/octet-stream")
+
+    #st.download_button(
+    #    label="Télécharger en CSV",
+    #    data= exporter_csv(search),
+    #    file_name="tableau.csv",
+    #    mime="text/csv",
+    #    icon=":material/download:"
+    #)
+
+    if "afficher_export_pdf" not in st.session_state:
+        st.session_state.afficher_export_pdf = False
+
+    if "afficher_articles_export_pdf" not in st.session_state:
+        st.session_state.afficher_articles_export_pdf = False
+
+    if "partie_selectionnee" not in st.session_state:
+        st.session_state.partie_selectionnee = None
+
+    if "articles_selectionnes" not in st.session_state:
+        st.session_state.articles_selectionnes = []
 
 
+    if st.button("Télécharger en pdf", key="ouvrir_export_pdf") : 
+        st.session_state.afficher_export_pdf = True
+
+    if st.session_state.afficher_export_pdf: 
+        parties = (df_all_partie[["id_partie","titre_partie"]].dropna().drop_duplicates(subset=["id_partie","titre_partie"]))
+        articles = (df_all_partie[["id_article","article"]].dropna(subset=["id_article"]).drop_duplicates(subset=["id_article","article"])) 
+        id_article_list = articles["id_article"].to_list()      
+
+        try:
+            with st.spinner("Chargement...") :
+                contenu = generer_content(search, id_article_list)
+                content = generer_pdf(contenu)
+                st.download_button(
+
+                    "Télécharger tous les articles",
+                    data=content,
+                    file_name="tableau.pdf",
+                    mime="application/pdf",
+                    icon=":material/download:")
+
+        except Exception as e:
+            st.error(f"Erreur lors de la génération du PDF : {e}")
+
+        if st.button("Sélectionner les parties à exporter"):
+            st.session_state.afficher_articles_export_pdf = True
+
+        if (st.session_state.afficher_articles_export_pdf and st.session_state.partie_selectionnee is None):
+            with st.container(horizontal=True):
+                for id_partie, titre_partie in parties.itertuples(index=False, name=None):
+                    if st.button(titre_partie, key=f"partie_{id_partie}"):
+                        st.session_state.partie_selectionnee = id_partie
+                        st.session_state.articles_selectionnes = []
+                        st.rerun()
+
+        if st.session_state.partie_selectionnee is not None:
+            articles_in_partie = df_all_partie[df_all_partie["id_partie"] == st.session_state.partie_selectionnee][["id_article", "article"]].drop_duplicates()
+            articles_selectionnes = []
+            for id_article, article in  articles_in_partie.itertuples(index = None, name = None) :
+                print("LISTE DES ARTICLES")
+                print(id_article)
+                if st.checkbox(article, key={id_article}) :
+                    articles_selectionnes.append(id_article)
+
+            st.session_state.articles_selectionnes = articles_selectionnes        
+
+            st.write(st.session_state.articles_selectionnes)
+            st.download_button(
+                label="Télécharger la sélection",
+                data= generer_pdf(generer_content(search,st.session_state.articles_selectionnes, st.session_state.partie_selectionnee)),
+                file_name="tableau.pdf",
+                mime="application/pdf",
+                icon=":material/download:"
+            )
+ 
 
 ############### LANCEMENT DE LA PAGE ###############
 
 search = st.query_params.get("discussion_choisie")
 if search:
     afficher_page(search)
-    st.divider()
+    afficher_boutons_download(search)
+
 
 else:
     st.error("Aucune discussion sélectionnée.")
-
-

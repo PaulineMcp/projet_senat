@@ -99,3 +99,78 @@ def exporter_csv(search) :
             ]
 
             ### faut encore convertir en csv
+
+
+### boutons
+#   st.download_button(
+#        "Télécharger une copie de la base en .DB",
+#        data=exporter_bdd(),
+#        file_name="ma_base_backup.db",
+#        mime="application/octet-stream")
+
+    #st.download_button(
+    #    label="Télécharger en CSV",
+    #    data= exporter_csv(search),
+    #    file_name="tableau.csv",
+    #    mime="text/csv",
+    #    icon=":material/download:"
+    #)
+
+#    if "afficher_export_pdf" not in st.session_state:
+#        st.session_state.afficher_export_pdf = False
+
+#    if "afficher_articles_export_pdf" not in st.session_state:
+#        st.session_state.afficher_articles_export_pdf = False
+
+#    if "partie_selectionnee" not in st.session_state:
+#        st.session_state.partie_selectionnee = None
+
+#    if "articles_selectionnes" not in st.session_state:
+#        st.session_state.articles_selectionnes = []
+
+
+#    if st.button("Télécharger en pdf", key="ouvrir_export_pdf") : 
+#        st.session_state.afficher_export_pdf = True
+
+#    if st.session_state.afficher_export_pdf: 
+#        parties = (df_all_partie[["id_partie","titre_partie"]].dropna().drop_duplicates(subset=["id_partie","titre_partie"]))
+#        articles = (df_all_partie[["id_article","article"]].dropna(subset=["id_article"]).drop_duplicates(subset=["id_article","article"])) 
+#        id_article_list = articles["id_article"].to_list()      
+
+#        try:
+#            with st.spinner("Génération du PDF") :
+#                contenu = generer_content(search, id_article_list)
+#                content = generer_pdf(contenu)
+#                st.download_button(
+#                    "Télécharger tous les articles",
+#                    data=content,
+#                    file_name="tableau.pdf",
+#                    mime="application/pdf",
+#                    icon=":material/download:")
+
+#        except Exception as e:
+#            st.error(f"Erreur lors de la génération du PDF : {e}")
+
+#        if st.button("Sélectionner les parties à exporter"):
+#            st.session_state.afficher_articles_export_pdf = True
+
+#        if (st.session_state.afficher_articles_export_pdf and st.session_state.partie_selectionnee is None):
+#            with st.container(horizontal=True):
+#                for id_partie, titre_partie in parties.itertuples(index=False, name=None):
+#                    if st.button(titre_partie, key=f"partie_{id_partie}"):
+#                        st.session_state.partie_selectionnee = id_partie
+#                        st.session_state.articles_selectionnes = []
+#                        st.rerun()
+
+#        if st.session_state.partie_selectionnee is not None:
+#            for id_article, article in articles.itertuples(index = None, name = None) :
+#                if st.checkbox(article, key={id_article}):
+#                    st.session_state.articles_selectionnes.append(id_article)
+
+#                st.download_button(
+#                    label="Télécharger la sélection",
+#                    data= generer_pdf(generer_content(search,st.session_state.articles_selectionnes)),
+#                    file_name="tableau.pdf",
+#                    mime="application/pdf",
+#                    icon=":material/download:"
+#                )

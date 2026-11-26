@@ -148,45 +148,19 @@ def init_disc(url: str, inputs: dict, conn=None) -> None:
 ############### PARTIES ET AMENDEMENTS ###############
 
 def fetch_content(id_disc: str, conn=None):
-    """
-    Récupère le contenu d'une discussion.
+    """ Récupère le contenu d'une discussion. Renvoie : df_parties, df_ordre, df_content"""
 
-    Renvoie :
-        df_parties
-        df_ordre
-        df_content
-    """
-
-    url_disc = get_info_from_id(
-        id_disc,
-        "url_disc",
-        conn=conn
-    )
-
-    nb_parties = get_info_from_id(
-        id_disc,
-        "nb_parties",
-        conn=conn
-    )
-
+    url_disc = get_info_from_id(id_disc,"url_disc",conn=conn)
+    nb_parties = get_info_from_id(id_disc, "nb_parties", conn=conn)
     soup = get_content_page(url_disc)
 
     df_parties = []
 
     df_ordre = pd.DataFrame(
-        columns=[
-            "id_amdt",
-            "id_partie",
-            "ordre_examen_in_partie"
-        ]
-    )
+        columns=["id_amdt","id_partie","ordre_examen_in_partie"]) # faut pas rajouter ordre_abs ??
 
     df_content = pd.DataFrame(
-        columns=[
-            "id_amdt",
-            "id_article",
-            "id_partie",
-            "amdt",
+        columns=["id_amdt","id_article","id_partie","amdt",
             "is_ss_amdt",
             "lien_amdt",
             "auteur",
@@ -237,13 +211,10 @@ def fetch_content(id_disc: str, conn=None):
     ############### DISCUSSION AVEC PLUSIEURS PARTIES ###############
 
     else:
-
         tables = soup.find_all("table")
-
         ordre = 1
 
         for table in tables:
-
             titre = table.find_previous("h5")
 
             if titre is None:
@@ -261,40 +232,21 @@ def fetch_content(id_disc: str, conn=None):
             tbody = table.find("tbody")
 
             if tbody is not None:
-
                 lines = tbody.find_all("tr")
-
-                parsed = [
-                    parsing_line(line)
-                    for line in lines
-                ]
+                parsed = [parsing_line(line) for line in lines]
 
                 df_tmp = pd.DataFrame(parsed)
 
                 if not df_tmp.empty:
 
                     df_ordre_tmp = turn_into_ordre(
-                        df_tmp.copy(),
-                        id_disc,
-                        ordre
-                    )
+                        df_tmp, id_disc, ordre)
 
-                    df_content_tmp = turn_into_content(
-                        df_tmp.copy(),
-                        id_disc,
-                        ordre,
-                        conn=conn
-                    )
+                    df_content_tmp = turn_into_content(df_tmp, id_disc, ordre, conn=conn)
 
-                    df_ordre = pd.concat(
-                        [df_ordre, df_ordre_tmp],
-                        ignore_index=True
-                    )
-
-                    df_content = pd.concat(
-                        [df_content, df_content_tmp],
-                        ignore_index=True
-                    )
+                    df_ordre = pd.concat([df_ordre, df_ordre_tmp],ignore_index=True)
+                    df_content = pd.concat([df_content, df_content_tmp],ignore_index=True)
+                    df_content.to_csv("debug_ordre.csv", index=False)
 
             ordre += 1
 
@@ -312,29 +264,15 @@ def fetch_content(id_disc: str, conn=None):
 
 def init_content(id_disc: str, conn=None) -> None:
     """Récupère et enregistre les parties, amendements et ordre."""
-
     if conn is None:
-
         with get_db() as conn:
-            init_content(id_disc, conn=conn)
-
+            init_content(id_disc, conn=conn)    # initialise la conn et relance la fonction
         return
 
-    df_parties, df_ordre, df_content = fetch_content(
-        id_disc,
-        conn=conn
-    )
-
-    # Respect de l'ordre des clés étrangères :
-    # parties -> amdts -> ordre_examen
+    df_parties, df_ordre, df_content = fetch_content(id_disc, conn=conn)
 
     if not df_parties.empty:
-        upsert_df(
-            "parties",
-            df_parties,
-            "id_partie",
-            conn=conn
-        )
+        upsert_df("parties", df_parties, "id_partie", conn=conn)
 
     if not df_content.empty:
 
@@ -760,3 +698,7 @@ def init_remplissage_articles(
 def vide(x):
     """Remplace une valeur manquante par None."""
     return None if pd.isna(x) else x
+
+# TEST
+a,b,c = fetch_content("2026-2027-SCE-155")
+print(b)

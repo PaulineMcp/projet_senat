@@ -45,7 +45,7 @@ CREATE TABLE ordre_examen(
 CREATE TABLE articles(
     id_bloc_article TEXT,
     bloc_article TEXT,
-    bloc TEXT,
+    bloc INT,
     id_article TEXT PRIMARY KEY,
     id_disc TEXT REFERENCES discussion(id_disc) ON DELETE CASCADE,
     article TEXT,

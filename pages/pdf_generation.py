@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 import math
+import streamlit as st
 
 
 # Chemin de la racine
@@ -127,8 +128,7 @@ def df2table(df):
     
     return table
 
-def generer_content(search : str, list_articles_selected : list):
-
+def generer_content(search : str, list_articles_selected : list, id_partie = None):
     content = []
 
     # Récupérer les infos
@@ -144,10 +144,14 @@ def generer_content(search : str, list_articles_selected : list):
     df = retrieve_tab(search)
     df_infos_disc = retrieve_infos_disc(search)
     titre_discussion = (df_infos_disc["titre_disc_long"].iloc[0])
+    
 
     # Ajout du titre
     content.append(Paragraph(str(titre_discussion), style_titre))
     content.append(Spacer(1, 12))
+
+    if id_partie :
+        df = df[df["id_partie"] == id_partie]
 
     parties = (df[["id_partie", "titre_partie"]].dropna(subset=["id_partie"]).drop_duplicates(subset=["id_partie"],keep="first"))
     for id_partie, titre_partie in parties.itertuples(index=False, name=None):
@@ -189,7 +193,7 @@ def generer_content(search : str, list_articles_selected : list):
                         content.append(encadrer_vote(f"Vote sur {article} : {dict_resumes_article.get(id_article)}"))
                         content.append(Spacer(1, 6))
             else : 
-                continue    
+                continue   
     return(content)
 
     
