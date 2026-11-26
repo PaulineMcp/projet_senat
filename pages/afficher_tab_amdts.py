@@ -598,13 +598,13 @@ def afficher_boutons_download(search : str):
         file_name="ma_base_backup.db",
         mime="application/octet-stream")
 
-    #st.download_button(
-    #    label="Télécharger en CSV",
-    #    data= exporter_csv(search),
-    #    file_name="tableau.csv",
-    #    mime="text/csv",
-    #    icon=":material/download:"
-    #)
+    st.download_button(
+        label="Télécharger en CSV",
+        data= exporter_csv(search),
+        file_name="tableau.csv",
+        mime="text/csv",
+        icon=":material/download:"
+    )
 
     if "afficher_export_pdf" not in st.session_state:
         st.session_state.afficher_export_pdf = False
@@ -664,7 +664,6 @@ def afficher_boutons_download(search : str):
 
             st.session_state.articles_selectionnes = articles_selectionnes        
 
-            st.write(st.session_state.articles_selectionnes)
             st.download_button(
                 label="Télécharger la sélection",
                 data= generer_pdf(generer_content(search,st.session_state.articles_selectionnes, st.session_state.partie_selectionnee)),

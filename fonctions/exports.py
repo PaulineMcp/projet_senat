@@ -34,71 +34,76 @@ def convert_for_download(df):
         ).encode("utf-8-sig")
 
 
-def exporter_csv(search) :
-        df_for_download = retrieve_tab(search)
+def exporter_csv(search):
+    df_for_download = retrieve_tab(search)
 
-        if not df_for_download.empty:
+    if not df_for_download.empty:
 
-            df_for_download = df_for_download.copy()
+        df_for_download = df_for_download.copy()
 
-            df_for_download["abrev_article"] = (
-                df_for_download["article"].apply(abrev_article)
+        df_for_download["abrev_article"] = (
+            df_for_download["article"].apply(abrev_article)
+        )
+
+        df_for_download["bloc"] = pd.to_numeric(
+            df_for_download["bloc"],
+            errors="coerce"
+        ).astype("Int64")
+
+        df_for_download = df_for_download.sort_values(
+            [
+                "id_partie",
+                "bloc",
+                "ordre_examen_in_partie"
+            ],
+            na_position="last"
+        )
+
+        df_for_download = ffill_df(df_for_download)
+
+        df_for_download["nom_groupe"] = (
+            df_for_download["nom_groupe"].fillna(
+                df_for_download["auteur"]
             )
+        )
 
-            df_for_download["bloc"] = pd.to_numeric(
-                df_for_download["bloc"],
-                errors="coerce"
-            ).astype("Int64")
-
-            df_for_download = df_for_download.sort_values(
-                [
-                    "id_partie",
-                    "bloc",
-                    "ordre_examen_in_partie"
-                ],
-                na_position="last"
+        # Filtrage des amendements actifs uniquement pour l'export.
+        df_for_download = df_for_download[
+            df_for_download["id_amdt"].notna()
+            & (
+                pd.to_numeric(
+                    df_for_download["is_active"],
+                    errors="coerce"
+                ) == 1
             )
+        ].copy()
 
-            df_for_download = ffill_df(
-                df_for_download
-            )
+        colonnes_csv = [
+            "abrev_article",
+            "amdt",
+            "nom_groupe",
+            "lien_amdt",
+            "lien_article",
+            "objet",
+            "com",
+            "avis_com",
+            "avis_gouv",
+            "proposition_vote_amdt",
+            "sort"
+        ]
 
-            df_for_download["nom_groupe"] = (
-                df_for_download["nom_groupe"].fillna(
-                    df_for_download["auteur"]
-                )
-            )
+        df_for_download = df_for_download[colonnes_csv]
 
-            # Filtrage des amendements actifs uniquement pour l'export.
-            df_for_download = df_for_download[
-                df_for_download["id_amdt"].notna()
-                & (
-                    pd.to_numeric(
-                        df_for_download["is_active"],
-                        errors="coerce"
-                    ) == 1
-                )
-            ].copy()
+        # Conversion en CSV
+        csv = df_for_download.to_csv(
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
 
-            colonnes_csv = [
-                "abrev_article",
-                "amdt",
-                "nom_groupe",
-                "lien_amdt",
-                "lien_article",
-                "objet",
-                "com",
-                "avis_com",
-                "avis_gouv",
-                "proposition_vote_amdt",
-                "sort"
-            ]
+        return csv
 
-            df_for_download = df_for_download[
-                colonnes_csv
-            ]
-
-            ### faut encore convertir en csv
+    return ""
 
 
 ### boutons

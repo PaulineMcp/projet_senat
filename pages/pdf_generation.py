@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import math
 import streamlit as st
+from reportlab.platypus import KeepTogether
 
 
 # Chemin de la racine
@@ -37,7 +38,6 @@ style_titre = ParagraphStyle(
     alignment=TA_LEFT,
     wordWrap="CJK",
     leading=28,
-    spaceAfter=4
 )
 
 style_partie = ParagraphStyle(
@@ -47,7 +47,6 @@ style_partie = ParagraphStyle(
     textColor=colors.HexColor("#333333"),
     alignment=TA_LEFT,
     leading=25,
-    spaceAfter=4
 )
 
 style_article = ParagraphStyle(
@@ -57,7 +56,6 @@ style_article = ParagraphStyle(
     textColor=colors.HexColor("#333333"),
     alignment=TA_LEFT,
     leading=20,
-    spaceAfter=4
 )
 
 style_vote = TableStyle([
@@ -114,9 +112,9 @@ def df2table(df):
 
     table = Table(
             data,
-            colWidths= [50, 100, 90, 180, 100, 80, 80, 60, 50], 
-            repeatRows=1,
+            colWidths= [50, 100, 90, 180, 100, 80, 80, 60, 50],
             style=[
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
                 ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 #('INNERGRID', (0,0), (-1,-1), 0.25, colors.black),
