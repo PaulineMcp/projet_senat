@@ -124,7 +124,9 @@ def df2table(df):
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#B7C9D6")),
                 #("BACKGROUND", (3, 5), (3, 5), colors.yellow))
                 ],
-            hAlign = 'LEFT')
+            hAlign = 'LEFT',
+            splitByRow=1,
+            splitInRow=1)
     
     return table
 
