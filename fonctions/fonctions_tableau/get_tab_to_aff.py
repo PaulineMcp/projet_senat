@@ -141,7 +141,6 @@ def retrieve_tab_autres_parties(id_disc : str) :
     df["abrev_article"] = (df["article"].apply(abrev_article))
     return(df)
 
-@st.cache_data(ttl=300, show_spinner=False)
 def retrieve_tab(id_disc : str) -> pd.DataFrame :
    df1 = retrieve_1_partie(id_disc)
    df2 = retrieve_tab_autres_parties(id_disc)

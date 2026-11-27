@@ -13,7 +13,6 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import Paragraph
 from fonctions.exports import exporter_bdd
 import re
-from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from pathlib import Path
 import pandas as pd
@@ -52,42 +51,6 @@ st.markdown("""
 ############### FONCTIONS GENERALES ###############
 import streamlit.components.v1 as components
 
-TTL_TELECHARGEMENTS = 600 
-
-def _en_octets(x):
-    """Si la fonction d'export renvoie un BytesIO, on le convertit (un BytesIO partagé est dangereux)."""
-    return x.getvalue() if hasattr(x, "getvalue") else x
-
-@st.cache_resource(ttl=TTL_TELECHARGEMENTS, show_spinner=False)
-def get_bdd_bytes():
-    return _en_octets(exporter_bdd())
-
-
-@st.cache_resource(ttl=TTL_TELECHARGEMENTS, show_spinner=False)
-def get_csv_bytes(search):
-    return _en_octets(exporter_csv(search))
-
-
-@st.cache_resource(ttl=TTL_TELECHARGEMENTS, show_spinner=False)
-def get_pdf_bytes(search, ids: tuple, partie=None):
-    # ids est un tuple : les listes ne sont pas hashables pour le cache.
-    if partie is None:
-        contenu = generer_content(search, list(ids))
-    else:
-        contenu = generer_content(search, list(ids), partie)
-    return _en_octets(generer_pdf(contenu))
-    
-def invalider_caches():
-    """A appeler après une sauvegarde réussie : les données ont changé."""
-    # retrieve_tab n'a .clear() que s'il est décoré par @st.cache_data dans get_tab_to_aff.py
-    getattr(retrieve_tab, "clear", lambda: None)()
-    get_bdd_bytes.clear()
-    get_csv_bytes.clear()
-    get_pdf_bytes.clear()
- 
-    # Dans cette session, on repasse en "à préparer"
-    for cle in ("bdd_prete", "csv_pret", "pdf_tous_pret", "pdf_sel_ids"):
-        st.session_state.pop(cle, None)
 
 def afficher_pagination(page_actuelle, nb_pages, page_key, search, position):
 
@@ -381,7 +344,6 @@ def sauvegarder_modifications() -> bool:
 
             conn.commit()
 
-        invalider_caches()
         # ------------------------------------------------------
         # 4. NETTOYAGE APRES SAUVEGARDE REUSSIE
         # ------------------------------------------------------
@@ -538,26 +500,9 @@ def afficher_page(search):
             st.link_button("Lien vers la note du groupe",lien_note_discussion)
         if lien_dossier_discussion:
             st.link_button("Lien vers le dossier législatif",lien_dossier_discussion)
-
-        #if st.button("Lien vers la version «sans édition possible»",width="stretch"):
-
-        url_actuelle = st.context.url
-        parsed = urlsplit(url_actuelle)
-
-        query = urlencode({"discussion_choisie": search})
-
-        url_vue_seule = urlunsplit((
-                parsed.scheme,
-                parsed.netloc,
-                "/vue_seule_tab_amdts",
-                query,
-                ""
-            ))
-
-        st.link_button(
-                "Lien vers la version sans édition possible",
-                url_vue_seule
-            )
+        if st.button("Lien vers la version «sans édition possible»",width="stretch"):
+            st.query_params["discussion_choisie"] = search
+            st.switch_page("pages/vue_seule_tab_amdts.py")
 
     st.space("medium")
 
@@ -733,7 +678,7 @@ def afficher_boutons_download(search : str):
 search = st.query_params.get("discussion_choisie")
 if search:
     afficher_page(search)
-    #afficher_boutons_download(search)
+    afficher_boutons_download(search)
 
 
 else:

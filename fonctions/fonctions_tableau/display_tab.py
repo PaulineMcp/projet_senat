@@ -99,12 +99,15 @@ def appliquer_style(df):
 def display_tab(df_by_article: pd.DataFrame, article: str, id_partie: str) -> pd.DataFrame:
 
     st.markdown(
-    """ <style>
-    div[data-testid="stDataEditor"] [role="gridcell"] {padding: 8px 5px !important;
+    """
+    <style>
+    div[data-testid="stDataEditor"] [role="gridcell"] {
+        padding: 8px 5px !important;
     }
     </style>
     """,
-    unsafe_allow_html=True,)
+    unsafe_allow_html=True,
+)
     
     row_height = 75 #get_row_height(df_by_article,{"objet": 200, "com": 200})
     hauteur_tab = 35 + len(df_by_article) * row_height + 3
@@ -329,4 +332,3 @@ def display_titre_resume_article(
 
     # Valeur commune disponible pour la sauvegarde
     resumes[id_article] = st.session_state[resume_commun_key]
-

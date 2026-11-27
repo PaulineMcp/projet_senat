@@ -20,7 +20,8 @@ afficher_tab_amdts = st.Page("pages/afficher_tab_amdts.py", title="Afficher tab 
 vue_seule_tab_amdts = st.Page("pages/vue_seule_tab_amdts.py", title="Afficher tab amdts vue seule")
 tutoriel = st.Page("pages/tutoriel.py", title="Tutoriel")
 
-pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts, tutoriel])
+pg = st.navigation([accueil, creer_discussion, recherche, discussions, afficher_tab_amdts, vue_seule_tab_amdts, tutoriel
+                    ])
 
 st.markdown(
     """
