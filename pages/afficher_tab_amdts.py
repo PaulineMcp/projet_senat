@@ -87,7 +87,6 @@ def valeurs_identiques(a, b):
 
     return a == b
 
-
 def get_nb_pages(nb_bloc: int) -> int:
     """Calcule le nombre de pages avec 5 blocs par page."""
 
@@ -95,7 +94,6 @@ def get_nb_pages(nb_bloc: int) -> int:
         return 0
 
     return math.ceil(nb_bloc / 5)
-
 
 def get_borne_min(page: int) -> int:
     """Retourne le premier numéro de bloc global de la page."""
@@ -111,84 +109,64 @@ def get_borne_max(borne_min : int) -> int :
         borne_max = borne_min + 4
     return(borne_max)
 
-def propager_ordre_examen(df) -> int :
-    """Fonction pour trouver l'emplacement des articles sans amendements"""
-    for index, row in df.iterrows():
-        print(f"ARTICLE REGARDE : {df.loc[index, "article"]}")
-        #if (df.loc[index, "ordre_examen_in_partie"] is None and df.loc[index, "ordre_partie"] is None) :
-        if (
-            pd.isna(df.loc[index, "ordre_examen_in_partie"])
-            and pd.isna(df.loc[index, "ordre_partie"])
-        ):
-            #df.loc[index, "ordre_examen_in_partie"] = 999999
-            df.loc[index, "ordre_partie"] = 1
-            row["ordre_partie"] = 1
-
-            id_disc = df.loc[index, "id_disc"]
-            article = df.loc[index,"article"]
-
-            num_article = article.replace(f"{id_disc}-", "")
-            match = re.search(r"\d+", num_article)
-
-            if not match: # cas des articles uniques, liminaires (pas des chiffres)
-                continue
-
-            chiffre_article = int(match.group())
-            chiffre_prev_article = chiffre_article - 1
-
-            if chiffre_article == 1 :
-                df.loc[index, "ordre_examen_in_partie"] = 9 # uniquement valable pour plf 2027
-
-            else : 
-                if "addav" in num_article :
-                    print("XXX")
-                #    if f"{id_disc}-addap{chiffre_prev_article}" in df["article"] :
-                #        filtered_df = df[df["article"] == f"{id_disc}-addap{chiffre_prev_article}"] & df[["is_active"] == 1] # que pour les is active
-                #        row["ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
-                elif "addap" in num_article :
-                    print("XXX")
-                #        filtered_df = df[df["article"] == f"{id_disc}-{chiffre_prev_article}"] & df[["is_active"] == 1]
-                #        row["ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
-                else:  # article principal
-                    if f"{id_disc}-addap{chiffre_prev_article}" in df["id_article"].values:
-                        filtered_df = df[
-                            (df["id_article"] == f"{id_disc}-addap{chiffre_prev_article}")
-                            & (df["is_active"] == 1)
-                            & (df["ordre_examen_in_partie"].notna())
-                        ]
-                    else:
-                        print("cas B")
-                        print(f"Article précédent = {id_disc}-{chiffre_prev_article}")
-
-                        filtered_df = pd.DataFrame()
-
-                        while chiffre_prev_article >= 1:
-                            filtered_df = df[
-                                (df["id_article"] == f"{id_disc}-{chiffre_prev_article}")
-                                & (df["is_active"].isin([1, None]) | df["is_active"].isna())
-                                & (df["ordre_examen_in_partie"].notna())
-                            ]
-
-                            print(filtered_df)
-
-                            if not filtered_df.empty:
-                                break
-
-                            chiffre_prev_article -= 1
-
-                    if not filtered_df.empty:
-                        df.loc[index, "ordre_examen_in_partie"] = filtered_df["ordre_examen_in_partie"].max()
-                    else:
-                        print("Aucun article précédent avec un ordre d'examen trouvé")
-        else :
-            print("Contient bien un ordre et tout ce qu'il faut")
-    return(df)
+def trouver_ordre_precedent(df, id_disc, n):
+    """Recule à partir de l'article n jusqu'à trouver un ordre d'examen.
+    À chaque niveau, on regarde d'abord l'additionnel après (addap) puis l'article lui-même.
+    Retourne None si rien n'est trouvé."""
+    while n >= 1:
+        for prefixe in ("addap", ""):
+            candidats = df[
+                (df["id_article"] == f"{id_disc}-{prefixe}{n}")
+                & (df["ordre_partie"] == 1)
+                & ((df["is_active"] == 1) | df["is_active"].isna())
+                & (df["ordre_examen_in_partie"].notna())
+            ]
+            if not candidats.empty:
+                return candidats["ordre_examen_in_partie"].max()
+        n -= 1
+    return None
 
 
+def propager_ordre_examen(df) -> pd.DataFrame:
+    """Trouve l'emplacement des articles sans amendements en reculant
+    jusqu'au premier article précédent qui a un ordre d'examen."""
 
+    for index in df.index:
+        if not (pd.isna(df.loc[index, "ordre_examen_in_partie"])
+                and pd.isna(df.loc[index, "ordre_partie"])):
+            continue
 
+        df.loc[index, "ordre_partie"] = 1
+
+        id_disc = df.loc[index, "id_disc"]
+        id_article = df.loc[index, "id_article"]
+
+        num_article = str(id_article).replace(f"{id_disc}-", "")
+        match = re.search(r"\d+", num_article)
+
+        if not match:  # articles uniques, liminaires (pas de chiffre)
+            continue
+
+        chiffre_article = int(match.group())
+
+        # Point de départ du recul :
+        # - addap N : se place après l'article N  -> on part de N
+        # - addav N et article N : se placent après N-1 -> on part de N-1
+        if "addap" in str(id_article):
+            depart = chiffre_article
+        else:
+            depart = chiffre_article - 1
+
+        ordre = trouver_ordre_precedent(df, id_disc, depart)
+
+        if ordre is None:
+            # plus rien en arrière : début de la partie (valable pour plf 2027)
+            df.loc[index, "ordre_examen_in_partie"] = 9
+        else:
+            df.loc[index, "ordre_examen_in_partie"] = ordre
+
+    return df
 ############### SAUVEGARDE ###############
-
 
 def sauvegarder_modifications() -> bool:
     """
@@ -379,9 +357,7 @@ def sauvegarder_modifications() -> bool:
 
         return False
 
-
 ############### STYLE GENERAL ###############
-
 
 st.markdown(
     """
@@ -401,8 +377,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-############### DISCUSSION SELECTIONNEE ###############
 
 
 
@@ -433,10 +407,11 @@ def afficher_page(search):
     #df_all_partie["ordre_partie"] = df_all_partie["ordre_partie"].fillna(value=1)
     df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
      # les articles sans amendements sont attribués à la premières partie par défaut
+
     
     df_all_partie = propager_ordre_examen(df_all_partie)
+    #st.dataframe(df_all_partie)
 
-#    df_all_partie["ordre_examen_in_partie"] = df_all_partie["ordre_examen_in_partie"].ffill()
     df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
     df_all_partie = df_all_partie[(df_all_partie["is_active"] == 1)|(df_all_partie["id_amdt"].isna())]
     df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
@@ -445,7 +420,7 @@ def afficher_page(search):
     bloc_globaux["bloc_global"] = range(-1,len(bloc_globaux)-1)
     df_all_partie = df_all_partie.merge(bloc_globaux, on = ["id_article","ordre_partie"]) 
     df_all_partie["nom_groupe"] = (df_all_partie["nom_groupe"].fillna(df_all_partie["auteur"])) # faudrait que ce soit géré dans la requête
-
+    df_all_partie = df_all_partie.sort_values(["ordre_partie","ordre_examen_in_partie"])
     # --------------------------------------------------
     # 2. INFORMATIONS DE LA DISCUSSION
     # --------------------------------------------------
